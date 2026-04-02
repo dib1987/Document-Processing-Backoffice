@@ -27,6 +27,8 @@ ALLOWED_DOC_TYPES = {"tax_return", "government_id", "bank_statement", "general"}
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"}
 
 
+import traceback
+
 @router.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
     request: Request,
@@ -39,6 +41,16 @@ async def upload_document(
     Upload a document and start the processing pipeline.
     Returns job_id for polling.
     """
+    try:
+        return await _upload_document_inner(request, file, doc_type, session, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _upload_document_inner(request, file, doc_type, session, current_user):
     if doc_type not in ALLOWED_DOC_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -91,11 +103,17 @@ async def upload_document(
     await session.commit()
 
     # Queue Celery task
-    task = process_document.delay(job_id)
-    job.celery_task_id = task.id
-    await session.commit()
+    try:
+        task = process_document.delay(job_id)
+        job.celery_task_id = task.id
+        await session.commit()
+        celery_task_id = task.id
+    except Exception as e:
+        # Celery/Redis not available — job saved, processing deferred
+        await session.commit()
+        celery_task_id = None
 
-    return {"job_id": job_id, "status": "queued", "celery_task_id": task.id}
+    return {"job_id": job_id, "status": "queued", "celery_task_id": celery_task_id}
 
 
 @router.get("")

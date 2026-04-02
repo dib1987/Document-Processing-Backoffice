@@ -3,11 +3,12 @@ import { useAuth, useOrganization } from '@clerk/nextjs'
 import { jobsApi, setAuthHeaders, DocType } from '@/lib/api'
 
 function useAuthHeaders() {
-  const { getToken } = useAuth()
+  const { getToken, userId } = useAuth()
   const { organization } = useOrganization()
   return async () => {
     const token = await getToken()
-    if (token && organization?.id) setAuthHeaders(token, organization.id)
+    const orgId = organization?.id ?? userId ?? ''
+    if (token) setAuthHeaders(token, orgId)
   }
 }
 

@@ -44,8 +44,9 @@ export default function UploadPage() {
       setJobId(result.job_id)
       setFile(null)
       toast({ title: 'Document uploaded — processing started' })
-    } catch {
-      toast({ title: 'Upload failed. Please try again.', variant: 'destructive' })
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Unknown error'
+      toast({ title: `Upload failed: ${msg}`, variant: 'destructive' })
     }
   }
 
