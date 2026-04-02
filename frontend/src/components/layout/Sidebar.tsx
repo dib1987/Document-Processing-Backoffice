@@ -13,11 +13,11 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/',        label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/upload',  label: 'Upload',       icon: Upload },
-  { href: '/review',  label: 'Review Queue', icon: ClipboardList, showBadge: true },
-  { href: '/audit',   label: 'Audit Trail',  icon: Shield },
-  { href: '/settings',label: 'Settings',     icon: Settings },
+  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard },
+  { href: '/upload',    label: 'Upload',       icon: Upload },
+  { href: '/review',    label: 'Review Queue', icon: ClipboardList, showBadge: true },
+  { href: '/audit',     label: 'Audit Trail',  icon: Shield },
+  { href: '/settings',  label: 'Settings',     icon: Settings },
 ]
 
 export function Sidebar({ onClose }: SidebarProps) {
@@ -45,7 +45,7 @@ export function Sidebar({ onClose }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
         {navItems.map(({ href, label, icon: Icon, showBadge }) => {
-          const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href)
+          const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link
               key={href}
