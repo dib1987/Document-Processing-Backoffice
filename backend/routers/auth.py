@@ -16,12 +16,65 @@ from svix.webhooks import Webhook, WebhookVerificationError
 
 from config import get_settings
 from database import get_db
+from middleware.auth_middleware import get_current_user
 from models.db_models import Organization, User
 from services import hubspot_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter()
+
+
+@router.get("/me")
+async def get_me(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Debug endpoint — returns current user and org info."""
+    org = await session.get(Organization, current_user.org_id)
+    return {
+        "user_id": current_user.id,
+        "clerk_user_id": current_user.clerk_user_id,
+        "email": current_user.email,
+        "role": current_user.role,
+        "org_id": current_user.org_id,
+        "org_found": org is not None,
+        "org_name": org.name if org else None,
+    }
+
+
+@router.post("/setup-org", status_code=status.HTTP_200_OK)
+async def setup_personal_org(
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Creates a personal organization for the current user if one doesn't exist.
+    Call this once after manual user setup to fix FK constraint errors on upload.
+    """
+    org = await session.get(Organization, current_user.org_id)
+    if org:
+        return {"status": "ok", "message": "Organization already exists", "org_id": org.id}
+
+    # Create a placeholder org and link existing user to it
+    new_org = Organization(
+        name=f"{current_user.email}'s Firm",
+        clerk_org_id=f"personal_{current_user.clerk_user_id}",
+        plan="free",
+    )
+    session.add(new_org)
+    await session.flush()
+
+    # Seed default HubSpot field mappings
+    await hubspot_service.seed_default_mapping(session, new_org.id)
+
+    # Update the user's org_id to the new org
+    current_user.org_id = new_org.id
+    await session.commit()
+
+    return {"status": "ok", "message": "Organization created", "org_id": new_org.id}
 
 
 @router.post("/webhook", status_code=status.HTTP_204_NO_CONTENT)

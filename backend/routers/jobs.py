@@ -6,6 +6,7 @@ GET  /jobs         — list all jobs for this org (with optional status filter)
 GET  /jobs/{id}    — job detail including extracted fields
 GET  /jobs/{id}/status — lightweight status poll (used by frontend progress tracker)
 """
+import logging
 import uuid
 from typing import Annotated
 
@@ -22,12 +23,11 @@ from tasks.processing_pipeline import process_document
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 ALLOWED_DOC_TYPES = {"tax_return", "government_id", "bank_statement", "general"}
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"}
 
-
-import traceback
 
 @router.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload_document(
@@ -46,8 +46,8 @@ async def upload_document(
     except HTTPException:
         raise
     except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Upload failed for user=%s org=%s: %s", current_user.id, getattr(request.state, 'org_id', 'unknown'), e)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
 async def _upload_document_inner(request, file, doc_type, session, current_user):
@@ -77,7 +77,14 @@ async def _upload_document_inner(request, file, doc_type, session, current_user)
 
     # Upload to S3
     content_type = file.content_type or "application/octet-stream"
-    storage_service.upload_file(file_bytes, s3_key, content_type)
+    try:
+        storage_service.upload_file(file_bytes, s3_key, content_type)
+    except Exception as s3_err:
+        logger.exception("S3 upload failed: %s", s3_err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Storage upload failed: {s3_err}",
+        )
 
     # Create job record
     job = Job(

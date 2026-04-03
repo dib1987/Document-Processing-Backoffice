@@ -170,7 +170,20 @@ async def approve_review(
     await session.commit()
 
     # Send to HubSpot using merged fields (original + corrections)
-    merged_fields = {**original_fields, **corrected}
+    from models.db_models import Organization
+    org = await session.get(Organization, job.org_id)
+    if not org or not org.hubspot_api_key:
+        # No HubSpot key configured — mark approved without CRM push
+        job.status = "crm_written"
+        await audit_service.log(
+            session, request.state.org_id, "CRM_WRITTEN",
+            job_id=job_id, user_id=request.state.user_id,
+            actor=current_user.email,
+            detail={"note": "HubSpot API key not configured — CRM push skipped"},
+        )
+        await session.commit()
+        return {"status": "crm_written", "contact_id": None, "note": "HubSpot not configured"}
+
     try:
         contact_id = await hubspot_service.create_contact(
             session=session,

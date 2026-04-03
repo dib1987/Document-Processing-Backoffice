@@ -17,23 +17,45 @@ Celery config:
 """
 import asyncio
 import logging
+import sys
 import time
 
 import anthropic
 from celery import Task
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from celery_app import celery_app
-from database import AsyncSessionLocal
+from config import get_settings
 from models.db_models import CRMLog, Extraction, Job, ReviewQueue, ValidationFlag
 from services import audit_service, extraction_service, hubspot_service, ocr_service, storage_service
 from services.validation_service import validate
 
 logger = logging.getLogger(__name__)
 
+# NullPool: no connection reuse across tasks — each task gets a fresh connection
+# on its own event loop, avoiding "Future attached to a different loop" errors.
+_settings = get_settings()
+_task_engine = create_async_engine(
+    _settings.database_url,
+    poolclass=NullPool,
+    connect_args={"statement_cache_size": 0},
+)
+AsyncSessionLocal = async_sessionmaker(
+    bind=_task_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
+
 
 def _run_async(coro):
     """Run an async coroutine from a sync Celery task context."""
+    # asyncpg is incompatible with Windows ProactorEventLoop — use SelectorEventLoop
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
         return loop.run_until_complete(coro)
     finally:

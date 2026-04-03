@@ -11,6 +11,8 @@ export default function ReviewQueuePage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [showReject, setShowReject] = useState(false)
+  const [editedFields, setEditedFields] = useState<Record<string, string>>({})
+  const [editingKey, setEditingKey] = useState<string | null>(null)
   const { toast } = useToast()
 
   const { data: detail } = useReviewDetail(selectedJobId)
@@ -20,9 +22,11 @@ export default function ReviewQueuePage() {
   const handleApprove = async () => {
     if (!selectedJobId) return
     try {
-      await approve.mutateAsync({ jobId: selectedJobId, correctedFields: detail?.extraction?.raw_fields ?? {} })
+      const mergedFields = { ...detail?.fields ?? {}, ...editedFields }
+      await approve.mutateAsync({ jobId: selectedJobId, correctedFields: mergedFields })
       toast({ title: 'Document approved and pushed to HubSpot' })
       setSelectedJobId(null)
+      setEditedFields({})
     } catch {
       toast({ title: 'Approval failed', variant: 'destructive' })
     }
@@ -72,7 +76,7 @@ export default function ReviewQueuePage() {
             }`}
           >
             <div className="flex items-center justify-between">
-              <p className="font-medium text-slate-800 truncate max-w-[200px]">{item.original_filename}</p>
+              <p className="font-medium text-slate-800 truncate max-w-[200px]">{item.filename}</p>
               <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
             </div>
             <p className="text-sm text-slate-400 mt-1">{DOC_TYPE_LABELS[item.doc_type]}</p>
@@ -90,7 +94,7 @@ export default function ReviewQueuePage() {
       {selectedJobId && detail ? (
         <div className="flex-1 bg-white rounded-xl border border-slate-200 p-5 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 truncate">{detail.original_filename}</h2>
+            <h2 className="font-semibold text-slate-800 truncate">{detail.filename}</h2>
             <button onClick={() => setSelectedJobId(null)} className="text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
@@ -110,17 +114,48 @@ export default function ReviewQueuePage() {
           )}
 
           {/* Extracted fields */}
-          {detail.extraction?.raw_fields && (
+          {detail.fields && Object.keys(detail.fields).length > 0 && (
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-slate-600 mb-2">Extracted Fields</h3>
-              <div className="space-y-2">
-                {Object.entries(detail.extraction.raw_fields).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-2 border-b border-slate-50">
-                    <span className="text-sm text-slate-500 capitalize">{key.replace(/_/g, ' ')}</span>
-                    <span className="text-sm font-medium text-slate-800">{String(value ?? '—')}</span>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-slate-600">Extracted Fields</h3>
+                <span className="text-xs text-slate-400">Click a value to edit</span>
               </div>
+              <div className="space-y-1">
+                {Object.entries(detail.fields).map(([key, value]) => {
+                  const displayValue = editedFields[key] ?? String(value ?? '')
+                  const isEdited = key in editedFields
+                  const isEditing = editingKey === key
+                  return (
+                    <div key={key} className="flex items-center justify-between py-2 border-b border-slate-50 gap-4">
+                      <span className="text-sm text-slate-500 capitalize shrink-0">{key.replace(/_/g, ' ')}</span>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          className="text-sm font-medium text-slate-800 text-right border border-indigo-300 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 w-48"
+                          value={displayValue}
+                          onChange={(e) => setEditedFields(prev => ({ ...prev, [key]: e.target.value }))}
+                          onBlur={() => setEditingKey(null)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingKey(null) }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (!(key in editedFields)) setEditedFields(prev => ({ ...prev, [key]: String(value ?? '') }))
+                            setEditingKey(key)
+                          }}
+                          className={`text-sm font-medium text-right px-2 py-0.5 rounded hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${isEdited ? 'text-indigo-600' : 'text-slate-800'}`}
+                          title="Click to edit"
+                        >
+                          {displayValue || <span className="text-slate-300 italic">empty</span>}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {Object.keys(editedFields).length > 0 && (
+                <p className="text-xs text-indigo-500 mt-2">{Object.keys(editedFields).length} field(s) edited</p>
+              )}
             </div>
           )}
 
