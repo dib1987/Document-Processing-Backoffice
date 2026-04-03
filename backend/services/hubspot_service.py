@@ -77,17 +77,24 @@ async def create_contact(
     job: Job,
     extracted_fields: dict[str, Any],
     reviewed_fields: dict[str, Any] | None = None,
+    hubspot_api_key: str | None = None,
 ) -> str:
     """
     Map extracted (or reviewer-corrected) fields to HubSpot properties
     and create a contact. Returns the HubSpot contact ID.
+
+    Pass hubspot_api_key explicitly to bypass SQLAlchemy identity map caching.
+    If not provided, fetches fresh from DB via direct query.
     """
     # Use reviewed_fields if provided (post-approval); fall back to extracted
     fields = {**extracted_fields, **(reviewed_fields or {})}
 
-    # Fetch the org's API key and field mapping
-    org = await session.get(Organization, job.org_id)
-    if not org or not org.hubspot_api_key:
+    # Fetch API key fresh from DB if not passed in (avoids identity map stale reads)
+    if hubspot_api_key is None:
+        hubspot_api_key = await session.scalar(
+            select(Organization.hubspot_api_key).where(Organization.id == job.org_id)
+        )
+    if not hubspot_api_key:
         raise ValueError(f"org={job.org_id} has no HubSpot API key configured")
 
     mapping = await _get_field_mapping(session, job.org_id, job.doc_type)

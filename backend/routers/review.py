@@ -167,55 +167,55 @@ async def approve_review(
         job_id=job_id, user_id=request.state.user_id,
         actor=current_user.email,
     )
-    await session.commit()
-
-    # Send to HubSpot using merged fields (original + corrections)
+    # Check if org has HubSpot configured — use direct query to avoid identity map cache
     from models.db_models import Organization
-    org = await session.get(Organization, job.org_id)
-    if not org or not org.hubspot_api_key:
-        # No HubSpot key configured — mark approved without CRM push
+    hubspot_key = await session.scalar(
+        select(Organization.hubspot_api_key).where(Organization.id == job.org_id)
+    )
+
+    if hubspot_key:
+        # HubSpot configured — push to CRM
+        try:
+            contact_id = await hubspot_service.create_contact(
+                session=session,
+                job=job,
+                extracted_fields=original_fields,
+                reviewed_fields=corrected,
+            )
+            job.status = "crm_written"
+            job.crm_contact_id = contact_id
+            await audit_service.log(
+                session, request.state.org_id, "CRM_WRITTEN",
+                job_id=job_id, user_id=request.state.user_id,
+                actor=current_user.email,
+                detail={"hubspot_contact_id": contact_id},
+            )
+            await session.commit()
+            return {"status": "crm_written", "contact_id": contact_id}
+        except Exception as exc:
+            job.status = "crm_error"
+            job.error_message = str(exc)[:500]
+            await audit_service.log(
+                session, request.state.org_id, "ERROR",
+                job_id=job_id, actor="System",
+                detail={"error": str(exc)[:300]},
+            )
+            await session.commit()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"HubSpot error: {exc}",
+            )
+    else:
+        # No HubSpot key — mark confirmed, back office will send correction request
         job.status = "crm_written"
         await audit_service.log(
             session, request.state.org_id, "CRM_WRITTEN",
             job_id=job_id, user_id=request.state.user_id,
             actor=current_user.email,
-            detail={"note": "HubSpot API key not configured — CRM push skipped"},
+            detail={"note": "Confirmed by reviewer — no HubSpot push (key not configured)"},
         )
         await session.commit()
-        return {"status": "crm_written", "contact_id": None, "note": "HubSpot not configured"}
-
-    try:
-        contact_id = await hubspot_service.create_contact(
-            session=session,
-            job=job,
-            extracted_fields=original_fields,
-            reviewed_fields=corrected,
-        )
-        job.status = "crm_written"
-        job.crm_contact_id = contact_id
-
-        await audit_service.log(
-            session, request.state.org_id, "CRM_WRITTEN",
-            job_id=job_id, user_id=request.state.user_id,
-            actor=current_user.email,
-            detail={"hubspot_contact_id": contact_id},
-        )
-        await session.commit()
-        return {"status": "crm_written", "contact_id": contact_id}
-
-    except Exception as exc:
-        job.status = "crm_error"
-        job.error_message = str(exc)[:500]
-        await audit_service.log(
-            session, request.state.org_id, "ERROR",
-            job_id=job_id, actor="System",
-            detail={"error": str(exc)[:300]},
-        )
-        await session.commit()
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"HubSpot error: {exc}",
-        )
+        return {"status": "crm_written", "contact_id": None}
 
 
 @router.post("/{job_id}/reject")
