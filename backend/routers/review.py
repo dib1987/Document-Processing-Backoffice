@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from middleware.auth_middleware import get_current_user, require_role
 from models.db_models import Extraction, Job, ReviewQueue, User, ValidationFlag
-from services import audit_service, hubspot_service, storage_service
+from services import audit_service, email_service, hubspot_service, storage_service
 
 router = APIRouter()
 
@@ -27,6 +27,10 @@ class ApproveRequest(BaseModel):
 
 class RejectRequest(BaseModel):
     reason: str
+
+
+class ReuploadRequest(BaseModel):
+    message: str = ""  # Optional note from back office to the uploader
 
 
 @router.get("")
@@ -173,8 +177,11 @@ async def approve_review(
         select(Organization.hubspot_api_key).where(Organization.id == job.org_id)
     )
 
+    # Always mark approved — HubSpot push is best-effort and never blocks approval
+    job.status = "crm_written"
+    contact_id = None
+
     if hubspot_key:
-        # HubSpot configured — push to CRM
         try:
             contact_id = await hubspot_service.create_contact(
                 session=session,
@@ -182,7 +189,6 @@ async def approve_review(
                 extracted_fields=original_fields,
                 reviewed_fields=corrected,
             )
-            job.status = "crm_written"
             job.crm_contact_id = contact_id
             await audit_service.log(
                 session, request.state.org_id, "CRM_WRITTEN",
@@ -190,32 +196,17 @@ async def approve_review(
                 actor=current_user.email,
                 detail={"hubspot_contact_id": contact_id},
             )
-            await session.commit()
-            return {"status": "crm_written", "contact_id": contact_id}
         except Exception as exc:
-            job.status = "crm_error"
+            # HubSpot failed — log it but don't block the approval
             job.error_message = str(exc)[:500]
             await audit_service.log(
-                session, request.state.org_id, "ERROR",
+                session, request.state.org_id, "CRM_PUSH_FAILED",
                 job_id=job_id, actor="System",
                 detail={"error": str(exc)[:300]},
             )
-            await session.commit()
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"HubSpot error: {exc}",
-            )
-    else:
-        # No HubSpot key — mark confirmed, back office will send correction request
-        job.status = "crm_written"
-        await audit_service.log(
-            session, request.state.org_id, "CRM_WRITTEN",
-            job_id=job_id, user_id=request.state.user_id,
-            actor=current_user.email,
-            detail={"note": "Confirmed by reviewer — no HubSpot push (key not configured)"},
-        )
-        await session.commit()
-        return {"status": "crm_written", "contact_id": None}
+
+    await session.commit()
+    return {"status": "approved", "contact_id": contact_id}
 
 
 @router.post("/{job_id}/reject")
@@ -250,6 +241,64 @@ async def reject_review(
     return {"status": "rejected"}
 
 
+@router.post("/{job_id}/request-reupload")
+async def request_reupload(
+    job_id: str,
+    body: ReuploadRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("reviewer")),
+):
+    """
+    Back office requests the uploader to re-upload a corrected document.
+    Sends an email to the uploader with the validation flags listed.
+    Job status → reupload_requested. Does not block on email failure.
+    """
+    job = await _get_reviewable_job(session, job_id, request.state.org_id)
+    review = await session.scalar(
+        select(ReviewQueue).where(ReviewQueue.job_id == job_id)
+    )
+    flags = (await session.scalars(
+        select(ValidationFlag).where(ValidationFlag.job_id == job_id)
+    )).all()
+
+    # Get the uploader's email
+    uploader = await session.get(User, job.uploaded_by) if job.uploaded_by else None
+    to_email = uploader.email if uploader else None
+
+    # Send email best-effort
+    email_sent = False
+    if to_email:
+        email_sent = email_service.send_reupload_request(
+            to_email=to_email,
+            filename=job.original_filename,
+            doc_type=job.doc_type,
+            flags=[f.plain_message for f in flags],
+            message=body.message,
+        )
+
+    # Update job and review record regardless of email outcome
+    job.status = "reupload_requested"
+    review.review_status = "reupload_requested"
+    review.reviewed_by = request.state.user_id
+    review.reviewed_at = datetime.now(timezone.utc)
+    review.reject_reason = body.message or "Re-upload requested"
+
+    await audit_service.log(
+        session, request.state.org_id, "REUPLOAD_REQUESTED",
+        job_id=job_id, user_id=request.state.user_id,
+        actor=current_user.email,
+        detail={"email_sent": email_sent, "to": to_email, "message": body.message},
+    )
+    await session.commit()
+
+    return {
+        "status": "reupload_requested",
+        "email_sent": email_sent,
+        "notified": to_email,
+    }
+
+
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
@@ -258,7 +307,7 @@ async def _get_reviewable_job(session, job_id: str, org_id: str) -> Job:
     job = await session.get(Job, job_id)
     if not job or job.org_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    if job.status not in ("review_queue", "crm_error"):
+    if job.status not in ("review_queue", "crm_error", "reupload_requested"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Job is not in review queue (current status: {job.status})",

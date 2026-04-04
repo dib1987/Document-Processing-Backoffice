@@ -35,18 +35,18 @@ DEFAULT_MAPPINGS: dict[str, dict[str, str]] = {
         "address_city":     "city",
         "address_state":    "state",
         "address_zip":      "zip",
-        "total_income":     "annual_revenue",
-        "tax_year":         "tax_year__c",
-        "ssn_primary":      "ssn_last4__c",
-        "filing_status":    "filing_status__c",
-        "form_type":        "tax_form_type__c",
+        "total_income":     "annualrevenue",
+        "tax_year":         "tax_year",         # HubSpot strips _c suffix from internal name
+        "ssn_primary":      "ssn_last4",
+        "filing_status":    "filing_status",
+        "form_type":        "tax_form_type",
     },
     "government_id": {
         "full_name":        "__split_name__",
-        "date_of_birth":    "date_of_birth__c",
-        "id_type":          "id_type__c",
-        "id_number":        "id_number_last4__c",
-        "expiration_date":  "id_expiration__c",
+        "date_of_birth":    "date_of_birth",
+        "id_type":          "id_type",
+        "id_number":        "id_number_last4",
+        "expiration_date":  "id_expiration",
         "address_street":   "address",
         "address_city":     "city",
         "address_state":    "state",
@@ -54,16 +54,16 @@ DEFAULT_MAPPINGS: dict[str, dict[str, str]] = {
     },
     "bank_statement": {
         "account_holder_name": "__split_name__",
-        "bank_name":           "bank_name__c",
-        "account_type":        "account_type__c",
-        "account_number":      "account_last4__c",
-        "ending_balance":      "bank_balance__c",
+        "bank_name":           "bank_name",
+        "account_type":        "account_type",
+        "account_number":      "description",   # standard HubSpot field
+        "ending_balance":      "annualrevenue",
     },
     "general": {
         "primary_person_name": "__split_name__",
         "issuing_entity":      "company",
-        "document_category":   "document_type__c",
-        "dollar_amount":       "document_amount__c",
+        "document_category":   "jobtitle",      # standard HubSpot field
+        "dollar_amount":       "annualrevenue",
     },
 }
 
@@ -109,7 +109,7 @@ async def create_contact(
         resp = await client.post(
             f"{HUBSPOT_API_BASE}/crm/v3/objects/contacts",
             headers={
-                "Authorization": f"Bearer {org.hubspot_api_key}",
+                "Authorization": f"Bearer {hubspot_api_key}",
                 "Content-Type": "application/json",
             },
             json={"properties": hs_properties},
@@ -120,7 +120,7 @@ async def create_contact(
         existing_id = _extract_existing_id(resp.json())
         if existing_id:
             logger.info("job=%s contact exists (%s) — updating", job.id, existing_id)
-            return await _update_contact(org.hubspot_api_key, existing_id, hs_properties, job.id)
+            return await _update_contact(hubspot_api_key, existing_id, hs_properties, job.id)
 
     if resp.status_code not in (200, 201):
         error_body = resp.text[:500]

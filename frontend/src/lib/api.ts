@@ -87,6 +87,10 @@ export interface AuditEntry {
 
 // ── API Functions ──────────────────────────────────────────
 
+export const authApi = {
+  me: () => api.get<{ user_id: string; email: string; role: string; org_id: string }>('/auth/me'),
+}
+
 export const jobsApi = {
   upload: (file: File, docType: DocType) => {
     const form = new FormData()
@@ -110,6 +114,10 @@ export const reviewApi = {
     api.post(`/review/${jobId}/approve`, { corrected_fields: correctedFields }),
   reject: (jobId: string, reason: string) =>
     api.post(`/review/${jobId}/reject`, { reason }),
+  requestReupload: (jobId: string, message: string) =>
+    api.post<{ status: string; email_sent: boolean; notified: string | null }>(
+      `/review/${jobId}/request-reupload`, { message }
+    ),
 }
 
 export const dashboardApi = {

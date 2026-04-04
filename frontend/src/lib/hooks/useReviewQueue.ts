@@ -68,3 +68,18 @@ export function useReject() {
     },
   })
 }
+
+export function useRequestReupload() {
+  const setupHeaders = useAuthHeaders()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ jobId, message }: { jobId: string; message: string }) => {
+      await setupHeaders()
+      return reviewApi.requestReupload(jobId, message)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['review-queue'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    },
+  })
+}

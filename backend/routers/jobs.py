@@ -35,7 +35,7 @@ async def upload_document(
     file: UploadFile,
     doc_type: Annotated[str, Form()],
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("reviewer")),
+    current_user: User = Depends(require_role("viewer")),
 ):
     """
     Upload a document and start the processing pipeline.

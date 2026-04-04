@@ -7,23 +7,31 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useReviewQueue } from '@/lib/hooks/useReviewQueue'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 interface SidebarProps {
   onClose?: () => void
 }
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard },
-  { href: '/upload',    label: 'Upload',       icon: Upload },
-  { href: '/review',    label: 'Review Queue', icon: ClipboardList, showBadge: true },
-  { href: '/audit',     label: 'Audit Trail',  icon: Shield },
-  { href: '/settings',  label: 'Settings',     icon: Settings },
+  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard, minRole: 'viewer' },
+  { href: '/upload',    label: 'Upload',       icon: Upload,           minRole: 'viewer' },
+  { href: '/review',    label: 'Review Queue', icon: ClipboardList,    minRole: 'reviewer', showBadge: true },
+  { href: '/audit',     label: 'Audit Trail',  icon: Shield,           minRole: 'reviewer' },
+  { href: '/settings',  label: 'Settings',     icon: Settings,         minRole: 'reviewer' },
 ]
+
+const ROLE_LEVEL: Record<string, number> = { viewer: 0, reviewer: 1, admin: 2 }
 
 export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const { data: reviewItems } = useReviewQueue()
+  const { data: currentUser } = useCurrentUser()
   const pendingCount = reviewItems?.length ?? 0
+  const userRole = currentUser?.role ?? 'viewer'
+  const userLevel = ROLE_LEVEL[userRole] ?? 0
+
+  const visibleItems = navItems.filter(item => userLevel >= (ROLE_LEVEL[item.minRole] ?? 0))
 
   return (
     <aside className="flex flex-col h-full bg-navy-900 w-64 shrink-0">
@@ -44,7 +52,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon, showBadge }) => {
+        {visibleItems.map(({ href, label, icon: Icon, showBadge }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link

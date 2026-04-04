@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     clerk_publishable_key: str = ""
     clerk_webhook_secret: str = ""
 
+    # Email (AWS SES)
+    ses_from_email: str = ""  # Must be a verified identity in AWS SES console
+
     # HubSpot
     hubspot_default_portal_url: str = "https://api.hubapi.com"
 

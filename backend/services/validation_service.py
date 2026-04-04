@@ -17,7 +17,7 @@ from typing import Any
 # ──────────────────────────────────────────────
 
 REQUIRED_FIELDS: dict[str, list[str]] = {
-    "tax_return":    ["taxpayer_name", "ssn_primary", "tax_year", "total_income"],
+    "tax_return":    ["taxpayer_name", "ssn_primary", "tax_year"],
     "government_id": ["full_name", "date_of_birth", "id_number", "expiration_date"],
     "bank_statement": ["account_holder_name", "account_number", "bank_name", "ending_balance"],
     "general":       ["primary_person_name", "document_date"],

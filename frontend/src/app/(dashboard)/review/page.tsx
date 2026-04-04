@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { useReviewQueue, useReviewDetail, useApprove, useReject } from '@/lib/hooks/useReviewQueue'
+import { useReviewQueue, useReviewDetail, useApprove, useReject, useRequestReupload } from '@/lib/hooks/useReviewQueue'
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate, DOC_TYPE_LABELS } from '@/lib/utils'
-import { ClipboardList, CheckCircle, XCircle, ChevronRight, X } from 'lucide-react'
+import { ClipboardList, CheckCircle, XCircle, ChevronRight, X, Mail } from 'lucide-react'
 
 export default function ReviewQueuePage() {
   const { data: items, isLoading } = useReviewQueue()
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [showReject, setShowReject] = useState(false)
+  const [showReupload, setShowReupload] = useState(false)
+  const [reuploadMessage, setReuploadMessage] = useState('')
   const [editedFields, setEditedFields] = useState<Record<string, string>>({})
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const { toast } = useToast()
@@ -18,6 +20,7 @@ export default function ReviewQueuePage() {
   const { data: detail } = useReviewDetail(selectedJobId)
   const approve = useApprove()
   const reject = useReject()
+  const requestReupload = useRequestReupload()
 
   const handleApprove = async () => {
     if (!selectedJobId) return
@@ -42,6 +45,23 @@ export default function ReviewQueuePage() {
       setShowReject(false)
     } catch {
       toast({ title: 'Rejection failed', variant: 'destructive' })
+    }
+  }
+
+  const handleRequestReupload = async () => {
+    if (!selectedJobId) return
+    try {
+      const res = await requestReupload.mutateAsync({ jobId: selectedJobId, message: reuploadMessage })
+      const notified = res.data.notified
+      toast({
+        title: 'Re-upload request sent',
+        description: notified ? `Email sent to ${notified}` : 'Request logged (email not configured)',
+      })
+      setSelectedJobId(null)
+      setReuploadMessage('')
+      setShowReupload(false)
+    } catch {
+      toast({ title: 'Failed to send re-upload request', variant: 'destructive' })
     }
   }
 
@@ -160,23 +180,58 @@ export default function ReviewQueuePage() {
           )}
 
           {/* Actions */}
-          {!showReject ? (
-            <div className="flex gap-3">
+          {!showReject && !showReupload ? (
+            <div className="space-y-2">
               <button
-                onClick={handleApprove}
-                disabled={approve.isPending}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                onClick={() => setShowReupload(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700"
               >
-                <CheckCircle className="w-4 h-4" />
-                {approve.isPending ? 'Approving...' : 'Approve & Push to CRM'}
+                <Mail className="w-4 h-4" />
+                Request Re-upload
               </button>
-              <button
-                onClick={() => setShowReject(true)}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 border border-red-200"
-              >
-                <XCircle className="w-4 h-4" />
-                Reject
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleApprove}
+                  disabled={approve.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-emerald-50 text-emerald-700 font-medium rounded-lg hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 text-sm"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {approve.isPending ? 'Approving...' : 'Approve & Push to CRM'}
+                </button>
+                <button
+                  onClick={() => setShowReject(true)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-50 text-red-600 font-medium rounded-lg hover:bg-red-100 border border-red-200 text-sm"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject
+                </button>
+              </div>
+            </div>
+          ) : showReupload ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500">An email will be sent to the document uploader asking them to re-upload with corrections.</p>
+              <textarea
+                value={reuploadMessage}
+                onChange={(e) => setReuploadMessage(e.target.value)}
+                placeholder="Optional message to the uploader (e.g. 'Please ensure the SSN is clearly visible')"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRequestReupload}
+                  disabled={requestReupload.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  <Mail className="w-4 h-4" />
+                  {requestReupload.isPending ? 'Sending...' : 'Send Re-upload Request'}
+                </button>
+                <button
+                  onClick={() => { setShowReupload(false); setReuploadMessage('') }}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
