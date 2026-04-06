@@ -49,18 +49,8 @@ async def get_dashboard_stats(
     # ── Hours saved (vs 2hr baseline per doc) ──────────────────
     hours_saved = round(docs_this_month * settings.hours_saved_per_doc_baseline, 1)
 
-    # ── Auto-approved rate (crm_written / total completed) ─────
-    total_completed = await session.scalar(
-        select(func.count(Job.id)).where(
-            Job.org_id == org_id,
-            Job.status.in_(["crm_written", "review_queue", "error"]),
-            Job.created_at >= month_start,
-        )
-    ) or 0
-    auto_approved_rate = (
-        round((docs_this_month / total_completed) * 100, 1)
-        if total_completed > 0 else 0.0
-    )
+    # ── Auto-approved count (crm_written without going through review) ─
+    auto_approved = docs_this_month  # all crm_written this month
 
     # ── Pending review count ────────────────────────────────────
     pending_review = await session.scalar(
@@ -69,6 +59,15 @@ async def get_dashboard_stats(
         .where(
             Job.org_id == org_id,
             ReviewQueue.review_status == "pending",
+        )
+    ) or 0
+
+    # ── Error count this month ──────────────────────────────────
+    errors = await session.scalar(
+        select(func.count(Job.id)).where(
+            Job.org_id == org_id,
+            Job.status.in_(["error", "crm_error"]),
+            Job.created_at >= month_start,
         )
     ) or 0
 
@@ -93,12 +92,11 @@ async def get_dashboard_stats(
     )).all()
 
     return {
-        "stats": {
-            "docs_processed_this_month": docs_this_month,
-            "hours_saved_this_month": hours_saved,
-            "auto_approved_rate": auto_approved_rate,
-            "pending_review_count": pending_review,
-        },
+        "total_processed": docs_this_month,
+        "auto_approved": auto_approved,
+        "pending_review": pending_review,
+        "errors": errors,
+        "hours_saved": hours_saved,
         "weekly_chart": weekly_chart,
         "recent_jobs": [
             {
@@ -125,7 +123,7 @@ def _build_weekly_chart(jobs: list, now: datetime) -> list[dict]:
             if j.created_at and week_start <= j.created_at < week_end
         )
         weeks.append({
-            "week_label": week_start.strftime("%-d %b") if hasattr(week_start, 'strftime') else str(week_start.date()),
+            "week_label": week_start.strftime("%d %b").lstrip("0") or "0",
             "count": count,
         })
     return weeks

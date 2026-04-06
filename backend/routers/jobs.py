@@ -116,9 +116,15 @@ async def _upload_document_inner(request, file, doc_type, session, current_user)
         await session.commit()
         celery_task_id = task.id
     except Exception as e:
-        # Celery/Redis not available — job saved, processing deferred
+        logger.exception("Failed to queue Celery task for job=%s: %s", job_id, e)
+        # Mark job as error so it doesn't silently stay queued forever
+        job.status = "error"
+        job.error_message = f"Failed to queue processing task: {type(e).__name__}: {e}"
         await session.commit()
-        celery_task_id = None
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Processing queue unavailable. Please ensure the worker service is running.",
+        )
 
     return {"job_id": job_id, "status": "queued", "celery_task_id": celery_task_id}
 

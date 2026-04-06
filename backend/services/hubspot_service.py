@@ -214,12 +214,28 @@ async def _update_contact(api_key: str, contact_id: str, properties: dict, job_i
 
 
 def _extract_existing_id(error_body: dict) -> str | None:
-    """Extract the existing contact ID from a HubSpot 409 conflict response."""
+    """
+    Extract the existing contact ID from a HubSpot 409 conflict response.
+
+    HubSpot returns the existing ID in one of two places depending on API version:
+      - error_body["context"]["ids"][0]  (newer)
+      - embedded in error_body["message"] as "...existing ID: 12345"
+    """
     try:
-        # HubSpot returns: {"message": "Contact already exists. ...", "error": "CONTACT_EXISTS"}
-        # The existing ID is typically in the error context
+        # Newer format: context.ids array
         context = error_body.get("context", {})
         ids = context.get("ids", [])
-        return ids[0] if ids else None
+        if ids:
+            return str(ids[0])
+
+        # Fallback: parse from message string
+        # e.g. "Contact already exists. Existing ID: 12345"
+        import re as _re
+        message = error_body.get("message", "")
+        match = _re.search(r"existing\s+id[:\s]+(\d+)", message, _re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        return None
     except Exception:
         return None

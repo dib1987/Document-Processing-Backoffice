@@ -27,8 +27,8 @@ from sqlalchemy.pool import NullPool
 
 from celery_app import celery_app
 from config import get_settings
-from models.db_models import CRMLog, Extraction, Job, ReviewQueue, ValidationFlag
-from services import audit_service, extraction_service, hubspot_service, ocr_service, storage_service
+from models.db_models import CRMLog, Extraction, Job, ReviewQueue, User, ValidationFlag
+from services import audit_service, email_service, extraction_service, hubspot_service, ocr_service, storage_service
 from services.validation_service import validate
 
 logger = logging.getLogger(__name__)
@@ -190,6 +190,22 @@ async def _pipeline(job_id: str, start_ms: int) -> dict:
             )
             await session.commit()
 
+            # Notify uploader best-effort
+            logger.info("job=%s looking up uploader: uploaded_by=%s", job_id, job.uploaded_by)
+            uploader = await session.get(User, job.uploaded_by) if job.uploaded_by else None
+            if not uploader:
+                logger.warning("job=%s uploader not found in DB (uploaded_by=%s) — skipping approval email", job_id, job.uploaded_by)
+            elif not uploader.email:
+                logger.warning("job=%s uploader has no email — skipping approval email", job_id)
+            else:
+                logger.info("job=%s sending approval email to %s", job_id, uploader.email)
+                email_service.send_approval_notification(
+                    to_email=uploader.email,
+                    filename=job.original_filename,
+                    doc_type=job.doc_type,
+                    crm_contact_id=contact_id,
+                )
+
             logger.info("job=%s complete → HubSpot contact=%s in %dms",
                         job_id, contact_id, job.processing_ms)
             return {"status": "crm_written", "contact_id": contact_id}
@@ -197,6 +213,7 @@ async def _pipeline(job_id: str, start_ms: int) -> dict:
         # ── Step 5b: FAIL → Review Queue ──────────────────────
         else:
             flag_summaries = [f.plain_message for f in result.flags]
+            job.processing_ms = int(time.time() * 1000) - start_ms
             await _set_status(session, job, "review_queue")
 
             session.add(ReviewQueue(job_id=job_id, review_status="pending"))

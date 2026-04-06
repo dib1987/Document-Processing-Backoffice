@@ -37,7 +37,7 @@ export function useJobStatus(jobId: string | null, enabled = true) {
     enabled: !!jobId && enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      const done = status === 'crm_written' || status === 'review_queue' || status === 'error' || status === 'crm_error'
+      const done = status === 'crm_written' || status === 'review_queue' || status === 'error' || status === 'crm_error' || status === 'reupload_requested'
       return done ? false : 3_000
     },
   })

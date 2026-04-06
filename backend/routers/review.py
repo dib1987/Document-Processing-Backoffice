@@ -177,8 +177,6 @@ async def approve_review(
         select(Organization.hubspot_api_key).where(Organization.id == job.org_id)
     )
 
-    # Always mark approved — HubSpot push is best-effort and never blocks approval
-    job.status = "crm_written"
     contact_id = None
 
     if hubspot_key:
@@ -190,6 +188,7 @@ async def approve_review(
                 reviewed_fields=corrected,
             )
             job.crm_contact_id = contact_id
+            job.status = "crm_written"
             await audit_service.log(
                 session, request.state.org_id, "CRM_WRITTEN",
                 job_id=job_id, user_id=request.state.user_id,
@@ -197,15 +196,30 @@ async def approve_review(
                 detail={"hubspot_contact_id": contact_id},
             )
         except Exception as exc:
-            # HubSpot failed — log it but don't block the approval
+            # HubSpot failed — mark approved but flag the CRM error
+            job.status = "crm_error"
             job.error_message = str(exc)[:500]
             await audit_service.log(
                 session, request.state.org_id, "CRM_PUSH_FAILED",
                 job_id=job_id, actor="System",
                 detail={"error": str(exc)[:300]},
             )
+    else:
+        # No HubSpot configured — mark approved without CRM write
+        job.status = "crm_written"
 
     await session.commit()
+
+    # Notify uploader best-effort (never block approval on email failure)
+    uploader = await session.get(User, job.uploaded_by) if job.uploaded_by else None
+    if uploader and uploader.email:
+        email_service.send_approval_notification(
+            to_email=uploader.email,
+            filename=job.original_filename,
+            doc_type=job.doc_type,
+            crm_contact_id=contact_id,
+        )
+
     return {"status": "approved", "contact_id": contact_id}
 
 

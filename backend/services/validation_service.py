@@ -161,21 +161,24 @@ def _check_cross_fields(fields: dict, doc_type: str, flags: list[ValidationFlag]
         val_a = fields.get(field_a)
         val_b = fields.get(field_b)
 
-        if field_a == "refund_amount" and field_b == "amount_owed":
-            # Both non-null and non-zero → inconsistent
-            a_num = _parse_dollar(str(val_a)) if val_a else None
-            b_num = _parse_dollar(str(val_b)) if val_b else None
-            if a_num and a_num > 0 and b_num and b_num > 0:
+        # Try dollar-amount comparison first (both fields are currency values)
+        a_num = _parse_dollar(str(val_a)) if val_a else None
+        b_num = _parse_dollar(str(val_b)) if val_b else None
+        if a_num is not None and b_num is not None:
+            # Generic rule: both fields have a positive value simultaneously → conflict
+            if a_num > 0 and b_num > 0:
                 flags.append(ValidationFlag(
                     flag_type="CROSS_FIELD",
                     field_name=f"{field_a}+{field_b}",
                     plain_message=message,
                 ))
+            continue
 
-        elif field_a == "expiration_date" and field_b == "issue_date":
-            exp = _parse_date(str(val_a)) if val_a else None
-            iss = _parse_date(str(val_b)) if val_b else None
-            if exp and iss and exp <= iss:
+        # Try date comparison (field_a must be after field_b)
+        a_date = _parse_date(str(val_a)) if val_a else None
+        b_date = _parse_date(str(val_b)) if val_b else None
+        if a_date is not None and b_date is not None:
+            if a_date <= b_date:
                 flags.append(ValidationFlag(
                     flag_type="CROSS_FIELD",
                     field_name=f"{field_a}+{field_b}",

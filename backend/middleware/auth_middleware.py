@@ -41,16 +41,20 @@ CLERK_JWKS_URL = "https://api.clerk.com/v1/jwks"
 _jwks_cache: dict | None = None
 
 
+async def _fetch_jwks() -> dict:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            CLERK_JWKS_URL,
+            headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def _get_jwks() -> dict:
     global _jwks_cache
     if _jwks_cache is None:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                CLERK_JWKS_URL,
-                headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
-            )
-            resp.raise_for_status()
-            _jwks_cache = resp.json()
+        _jwks_cache = await _fetch_jwks()
     return _jwks_cache
 
 
@@ -58,18 +62,21 @@ async def _verify_clerk_token(token: str) -> dict:
     """
     Verify a Clerk JWT and return its claims.
     Raises HTTPException(401) on failure.
+    Re-fetches JWKS if the token's key ID is not in the cache (handles key rotation).
     """
+    global _jwks_cache
     try:
         # Decode header to get key ID
         header = jwt.get_unverified_header(token)
         kid = header.get("kid")
 
         jwks = await _get_jwks()
-        public_key = None
-        for key in jwks.get("keys", []):
-            if key.get("kid") == kid:
-                public_key = key
-                break
+        public_key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
+
+        # kid not in cache — Clerk may have rotated keys, re-fetch once
+        if not public_key:
+            _jwks_cache = await _fetch_jwks()
+            public_key = next((k for k in _jwks_cache.get("keys", []) if k.get("kid") == kid), None)
 
         if not public_key:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unknown JWT key")

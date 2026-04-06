@@ -203,7 +203,7 @@ def _mask_sensitive_fields(fields: dict[str, Any]) -> dict[str, Any]:
 
         # For fields explicitly about account/routing/SSN numbers, enforce last-4-only format
         key_lower = key.lower()
-        if any(kw in key_lower for kw in ("ssn", "account_number", "routing")):
+        if any(kw in key_lower for kw in ("ssn", "account_number")):
             # If it still contains digits beyond last 4, mask
             digits = re.sub(r"\D", "", val_str)
             if len(digits) > 4:

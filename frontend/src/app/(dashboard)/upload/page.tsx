@@ -52,7 +52,9 @@ export default function UploadPage() {
     }
   }
 
-  const isTerminal = jobStatus && ['crm_written', 'review_queue', 'error', 'crm_error'].includes(jobStatus.status)
+  const isTerminal = jobStatus && ['crm_written', 'review_queue', 'error', 'crm_error', 'reupload_requested'].includes(jobStatus.status)
+
+  const ACCEPT = '.pdf,.jpg,.jpeg,.png,.tiff,.tif,.bmp'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -66,10 +68,10 @@ export default function UploadPage() {
           dragging ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50'
         }`}
       >
-        <input ref={inputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+        <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-        <p className="font-medium text-slate-700">Drop a PDF here or click to browse</p>
-        <p className="text-sm text-slate-400 mt-1">Maximum file size: 20MB</p>
+        <p className="font-medium text-slate-700">Drop a file here or click to browse</p>
+        <p className="text-sm text-slate-400 mt-1">PDF, JPG, PNG, TIFF — maximum 50 MB</p>
       </div>
 
       {/* Selected file */}
@@ -115,29 +117,36 @@ export default function UploadPage() {
         {upload.isPending ? 'Uploading...' : 'Upload & Process'}
       </button>
 
-      {/* Job status tracker */}
-      {jobId && jobStatus && (
+      {/* Job status tracker — shown as soon as jobId exists, even before first poll */}
+      {jobId && (
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-slate-800">Processing Status</h3>
-            <StatusBadge status={jobStatus.status} />
+            {jobStatus ? (
+              <StatusBadge status={jobStatus.status} />
+            ) : (
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-500">queued</span>
+            )}
           </div>
-          {isTerminal && jobStatus.status === 'crm_written' && (
+          {isTerminal && jobStatus?.status === 'crm_written' && (
             <div className="flex items-center gap-2 text-emerald-600 text-sm mt-2">
               <CheckCircle className="w-4 h-4" />
               <span>Successfully pushed to HubSpot CRM</span>
             </div>
           )}
-          {isTerminal && jobStatus.status === 'review_queue' && (
+          {isTerminal && jobStatus?.status === 'review_queue' && (
             <p className="text-amber-600 text-sm mt-2">Document needs manual review — check the Review Queue.</p>
           )}
-          {isTerminal && ['error', 'crm_error'].includes(jobStatus.status) && (
-            <p className="text-red-600 text-sm mt-2">{jobStatus.error_message ?? 'An error occurred during processing.'}</p>
+          {isTerminal && jobStatus?.status === 'reupload_requested' && (
+            <p className="text-amber-600 text-sm mt-2">Re-upload requested — the uploader has been notified by email.</p>
+          )}
+          {isTerminal && ['error', 'crm_error'].includes(jobStatus?.status ?? '') && (
+            <p className="text-red-600 text-sm mt-2">{jobStatus?.error_message ?? 'An error occurred during processing.'}</p>
           )}
           {!isTerminal && (
             <div className="flex items-center gap-2 text-blue-600 text-sm mt-2">
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              <span>Processing your document...</span>
+              <span>{jobStatus ? 'Processing your document...' : 'Queued — waiting for worker...'}</span>
             </div>
           )}
         </div>
