@@ -14,7 +14,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard, minRole: 'viewer' },
+  { href: '/dashboard', label: 'Dashboard',    icon: LayoutDashboard, minRole: 'reviewer' },
   { href: '/upload',    label: 'Upload',       icon: Upload,           minRole: 'viewer' },
   { href: '/review',    label: 'Review Queue', icon: ClipboardList,    minRole: 'reviewer', showBadge: true },
   { href: '/audit',     label: 'Audit Trail',  icon: Shield,           minRole: 'reviewer' },

@@ -21,9 +21,11 @@ export default function UploadPage() {
   const upload = useUpload()
   const { data: jobStatus } = useJobStatus(jobId)
 
+  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']
   const handleFile = (f: File) => {
-    if (!f.type.includes('pdf') && !f.name.endsWith('.pdf')) {
-      toast({ title: 'Only PDF files are supported', variant: 'destructive' })
+    const ext = '.' + f.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      toast({ title: 'Unsupported file type. Please upload a PDF, JPG, PNG, or TIFF.', variant: 'destructive' })
       return
     }
     setFile(f)

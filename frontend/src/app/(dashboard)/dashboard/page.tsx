@@ -1,13 +1,22 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useJobs } from '@/lib/hooks/useJobs'
 import { useDashboard } from '@/lib/hooks/useDashboard'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { formatDate, DOC_TYPE_LABELS } from '@/lib/utils'
 import { FileText, CheckCircle, Clock, AlertTriangle, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 export default function DashboardPage() {
+  const { data: currentUser } = useCurrentUser()
+  const router = useRouter()
+  useEffect(() => {
+    if (currentUser?.role === 'viewer') router.replace('/upload')
+  }, [currentUser, router])
+
   const { data: stats, isLoading: statsLoading } = useDashboard()
   const { data: jobs, isLoading: jobsLoading } = useJobs({ limit: 10 })
 
