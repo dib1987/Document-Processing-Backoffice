@@ -17,7 +17,7 @@ export function setAuthHeaders(token: string, orgId: string) {
 
 export type JobStatus =
   | 'pending' | 'queued' | 'ocr' | 'extracting' | 'validating'
-  | 'review_queue' | 'crm_pending' | 'crm_written' | 'crm_error' | 'error'
+  | 'review_queue' | 'crm_pending' | 'crm_written' | 'crm_error' | 'error' | 'reupload_requested'
 
 export type DocType = 'tax_return' | 'government_id' | 'bank_statement' | 'general'
 

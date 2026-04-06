@@ -122,32 +122,34 @@ export default function UploadPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-slate-800">Processing Status</h3>
-            {jobStatus ? (
-              <StatusBadge status={jobStatus.status} />
-            ) : (
-              <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-500">queued</span>
+            {!isTerminal && (
+              jobStatus
+                ? <StatusBadge status={jobStatus.status} />
+                : <span className="text-xs font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-500">queued</span>
             )}
           </div>
-          {isTerminal && jobStatus?.status === 'crm_written' && (
+          {isTerminal && !['error', 'crm_error'].includes(jobStatus?.status ?? '') && (
             <div className="flex items-center gap-2 text-emerald-600 text-sm mt-2">
               <CheckCircle className="w-4 h-4" />
-              <span>Successfully pushed to HubSpot CRM</span>
+              <span>Upload successful — you will be notified by email.</span>
             </div>
           )}
-          {isTerminal && jobStatus?.status === 'review_queue' && (
-            <p className="text-amber-600 text-sm mt-2">Document needs manual review — check the Review Queue.</p>
-          )}
-          {isTerminal && jobStatus?.status === 'reupload_requested' && (
-            <p className="text-amber-600 text-sm mt-2">Re-upload requested — the uploader has been notified by email.</p>
-          )}
           {isTerminal && ['error', 'crm_error'].includes(jobStatus?.status ?? '') && (
-            <p className="text-red-600 text-sm mt-2">{jobStatus?.error_message ?? 'An error occurred during processing.'}</p>
+            <p className="text-red-600 text-sm mt-2">Processing failed. Please try again or contact support.</p>
           )}
           {!isTerminal && (
             <div className="flex items-center gap-2 text-blue-600 text-sm mt-2">
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
               <span>{jobStatus ? 'Processing your document...' : 'Queued — waiting for worker...'}</span>
             </div>
+          )}
+          {isTerminal && (
+            <button
+              onClick={() => { setJobId(null); setFile(null) }}
+              className="mt-4 w-full py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+            >
+              Upload Another Document
+            </button>
           )}
         </div>
       )}

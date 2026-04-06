@@ -116,11 +116,27 @@ async def create_contact(
         )
 
     if resp.status_code == 409:
-        # Contact already exists — update instead
+        # Contact already exists — try to update, fall back gracefully if update or ID unresolvable
         existing_id = _extract_existing_id(resp.json())
         if existing_id:
             logger.info("job=%s contact exists (%s) — updating", job.id, existing_id)
-            return await _update_contact(hubspot_api_key, existing_id, hs_properties, job.id)
+            try:
+                return await _update_contact(hubspot_api_key, existing_id, hs_properties, job.id)
+            except RuntimeError as update_err:
+                logger.warning("job=%s HubSpot update failed (%s) — falling back to duplicate", job.id, update_err)
+        # 409 but can't extract ID (HubSpot response format unexpected) — search by email
+        email = hs_properties.get("email")
+        if email:
+            found_id = await _search_contact_by_email(hubspot_api_key, email, job.id)
+            if found_id:
+                logger.info("job=%s found contact via search (%s) — updating", job.id, found_id)
+                try:
+                    return await _update_contact(hubspot_api_key, found_id, hs_properties, job.id)
+                except RuntimeError as update_err:
+                    logger.warning("job=%s HubSpot search-update failed (%s) — falling back to duplicate", job.id, update_err)
+        # Contact exists but we can't update it — treat as success to avoid blocking the job and email
+        logger.warning("job=%s HubSpot 409 but could not resolve/update existing contact — marking as written", job.id)
+        return "duplicate"
 
     if resp.status_code not in (200, 201):
         error_body = resp.text[:500]
@@ -195,6 +211,22 @@ def _apply_mapping(
             hs_props[hs_key] = str(value).strip()
 
     return hs_props
+
+
+async def _search_contact_by_email(api_key: str, email: str, job_id: str) -> str | None:
+    """Search HubSpot for a contact by email. Returns contact ID or None."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            f"{HUBSPOT_API_BASE}/crm/v3/objects/contacts/search",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"filterGroups": [{"filters": [{"propertyName": "email", "operator": "EQ", "value": email}]}], "limit": 1},
+        )
+    if resp.status_code == 200:
+        results = resp.json().get("results", [])
+        if results:
+            return str(results[0].get("id", ""))
+    logger.warning("job=%s HubSpot contact search failed (%d)", job_id, resp.status_code)
+    return None
 
 
 async def _update_contact(api_key: str, contact_id: str, properties: dict, job_id: str) -> str:
