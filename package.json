@@ -1,6 +1,14 @@
 {
-  "dependencies": {
-    "@clerk/nextjs": "^7.0.8",
-    "@tanstack/react-query": "^5.96.1"
+  "name": "docflow-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "accounting": "cd apps/accounting && npm run dev",
+    "healthcare": "cd apps/healthcare && npm run dev",
+    "legal": "cd apps/legal && npm run dev"
   }
 }

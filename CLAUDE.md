@@ -4,7 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**DocFlow AI** is a full-stack document intelligence platform for accounting firms. It automates processing of client documents (tax returns, government IDs, bank statements) by extracting structured data via Claude AI, validating it, and either auto-pushing to HubSpot CRM or routing to a human review queue.
+**DocFlow AI** is a full-stack document intelligence platform. It automates processing of client documents by extracting structured data via Claude AI, validating it, and either auto-pushing to a CRM or routing to a human review queue.
+
+The platform is multi-domain: one shared backend, one frontend app per industry vertical.
+
+```
+apps/
+  accounting/    ← accounting firm UI (active)
+  healthcare/    ← clinic/hospital UI (stub — scaffold when first healthcare client onboards)
+  legal/         ← law firm UI (stub — scaffold when first legal client onboards)
+packages/
+  ui/            ← shared UI components (extract here when 2+ apps share components)
+  api-client/    ← shared API hooks (extract here when 2+ apps share API calls)
+backend/
+  domains/
+    accounting/  ← doc types: tax_return, government_id, bank_statement, general
+    healthcare/  ← stub
+    legal/       ← stub
+```
 
 ## Commands
 
@@ -31,15 +48,20 @@ alembic upgrade head        # apply all migrations
 alembic revision --autogenerate -m "description"  # create new migration
 ```
 
-### Frontend
+### Frontend (per domain app)
 
 ```bash
-# From frontend/ directory
+# From the domain app directory, e.g. apps/accounting/
 npm install
 npm run dev      # port 3000
 npm run build
 npm run lint
 npm start        # production
+
+# Or from workspace root:
+npm run accounting   # starts apps/accounting dev server
+npm run healthcare   # starts apps/healthcare dev server (once scaffolded)
+npm run legal        # starts apps/legal dev server (once scaffolded)
 ```
 
 ### Environment Setup
@@ -101,8 +123,8 @@ Every status transition is written to `audit_log`. Job status lifecycle:
 | `backend/models/schemas.py` | Pydantic extraction schemas per doc type; all fields `Optional[str]` |
 | `backend/middleware/auth_middleware.py` | Clerk JWT verification → injects `org_id`, `user_id`, `role` into `request.state` |
 | `backend/routers/export.py` | `GET /export/csv` and `/export/json`; admin-only; org-scoped |
-| `frontend/src/lib/api.ts` | Centralized Axios client + all API functions + TypeScript types |
-| `frontend/src/lib/hooks/` | React Query hooks (useJobs, useReviewQueue, useDashboard, useCurrentUser) |
+| `apps/accounting/src/lib/api.ts` | Centralized Axios client + all API functions + TypeScript types |
+| `apps/accounting/src/lib/hooks/` | React Query hooks (useJobs, useReviewQueue, useDashboard, useCurrentUser) |
 
 ### Multi-Tenancy & Auth
 
@@ -120,21 +142,34 @@ Every status transition is written to `audit_log`. Job status lifecycle:
 - `Job` → `Extraction` (JSONB `raw_fields` + `confidence` scores), `ValidationFlag`, `ReviewQueue`, `CRMLog`, `AuditLog`
 - `AuditLog` — append-only; never update or delete rows
 
+### Domain Plug-in Architecture
+
+All domain knowledge lives in `backend/domains/` — services are domain-agnostic.
+
+- `backend/domains/base.py` — `DomainConfig` dataclass + `CrossFieldRule` NamedTuple
+- `backend/domains/__init__.py` — `DOMAIN_REGISTRY`, `get_domain(doc_type)`, `allowed_types()`
+- `backend/domains/accounting/` — 4 accounting doc types (active)
+- `backend/domains/healthcare/` — stub (add `patient_intake.py`, `insurance_claim.py` here)
+- `backend/domains/legal/` — stub (add `contract.py`, `court_filing.py` here)
+
+To add a new doc type: create a `DomainConfig` in the appropriate domain package and add it to that package's domain list. Zero changes to any service required.
+
 ### Validation Configuration
 
-To adjust validation behavior, edit constants at the top of `backend/services/validation_service.py`:
-- `REQUIRED_FIELDS` — per doc type, which fields must be non-null
-- `FORMAT_RULES` — regex patterns (SSN masked format, zip, ISO dates)
-- `RANGE_RULES` — numeric min/max for dollar amounts
-- `CROSS_FIELD_RULES` — field pairs that cannot both be set simultaneously
+Validation rules are defined per-domain in `DomainConfig`:
+- `required_fields` — fields that must be non-null
+- `format_rules` — dict of field → regex pattern string
+- `range_rules` — dict of field → (min, max) tuple
+- `cross_field_rules` — list of `CrossFieldRule` (mutually_exclusive | date_order)
 
-### Frontend
+### Frontend (apps/accounting — reference implementation)
 
 - Next.js 14 App Router with Clerk integration
-- `frontend/src/app/(dashboard)/` — all protected pages (upload, review, audit, settings)
-- `frontend/src/middleware.ts` — Next.js auth middleware (protects all dashboard routes)
+- `apps/accounting/src/app/(dashboard)/` — all protected pages (upload, review, audit, settings)
+- `apps/accounting/src/middleware.ts` — Next.js auth middleware (protects all dashboard routes)
 - React Query for server state; `useJobStatus` polls every 3s while a job is processing
-- Radix UI + Tailwind CSS for components; `frontend/src/lib/utils.ts` has `cn()` helper
+- Radix UI + Tailwind CSS for components; `apps/accounting/src/lib/utils.ts` has `cn()` helper
+- Each domain app (`apps/healthcare/`, `apps/legal/`) follows the same structure with domain-specific branding, copy, and doc type UX
 
 ### PII Handling
 

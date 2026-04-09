@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from domains import allowed_types, get_domain
 from middleware.auth_middleware import require_role
 from models.db_models import HubSpotFieldMapping, Organization, User
 from services import hubspot_service
@@ -97,9 +98,6 @@ async def update_hubspot_key(
 # Field mapping endpoints
 # ──────────────────────────────────────────────
 
-VALID_DOC_TYPES = {"tax_return", "government_id", "bank_statement", "general"}
-
-
 @router.get("/field-mapping")
 async def get_field_mapping(
     request: Request,
@@ -117,10 +115,10 @@ async def get_field_mapping(
     Special directives:
       "firstname + lastname"  — splits a full name into HubSpot firstname/lastname
     """
-    if doc_type not in VALID_DOC_TYPES:
+    if doc_type not in allowed_types():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"doc_type must be one of: {', '.join(sorted(VALID_DOC_TYPES))}",
+            detail=f"doc_type must be one of: {', '.join(sorted(allowed_types()))}",
         )
 
     org_id = request.state.org_id
@@ -141,7 +139,7 @@ async def get_field_mapping(
         }
 
     # Fall back to the built-in default (in case seeding was missed)
-    default = hubspot_service.DEFAULT_MAPPINGS.get(doc_type, {})
+    default = get_domain(doc_type).default_hubspot_mapping
     return {
         "doc_type": doc_type,
         "mapping": default,
@@ -166,12 +164,12 @@ async def get_all_field_mappings(
     saved = {r.doc_type: {"mapping": r.mapping, "updated_at": r.updated_at.isoformat() if r.updated_at else None} for r in rows}
 
     result = {}
-    for dt in VALID_DOC_TYPES:
+    for dt in allowed_types():
         if dt in saved:
             result[dt] = saved[dt]
         else:
             result[dt] = {
-                "mapping": hubspot_service.DEFAULT_MAPPINGS.get(dt, {}),
+                "mapping": get_domain(dt).default_hubspot_mapping,
                 "updated_at": None,
             }
 
@@ -196,10 +194,10 @@ async def update_field_mapping(
     Special directives:
       "firstname + lastname"  — splits full_name / taxpayer_name into two HubSpot fields
     """
-    if body.doc_type not in VALID_DOC_TYPES:
+    if body.doc_type not in allowed_types():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"doc_type must be one of: {', '.join(sorted(VALID_DOC_TYPES))}",
+            detail=f"doc_type must be one of: {', '.join(sorted(allowed_types()))}",
         )
 
     if not body.mapping:
@@ -244,14 +242,14 @@ async def reset_field_mapping(
     Resets a doc type's field mapping back to the built-in default.
     Useful if a custom mapping is broken or if HubSpot was reconfigured.
     """
-    if doc_type not in VALID_DOC_TYPES:
+    if doc_type not in allowed_types():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"doc_type must be one of: {', '.join(sorted(VALID_DOC_TYPES))}",
+            detail=f"doc_type must be one of: {', '.join(sorted(allowed_types()))}",
         )
 
     org_id = request.state.org_id
-    default_mapping = hubspot_service.DEFAULT_MAPPINGS.get(doc_type, {})
+    default_mapping = get_domain(doc_type).default_hubspot_mapping
 
     existing = await session.scalar(
         select(HubSpotFieldMapping).where(

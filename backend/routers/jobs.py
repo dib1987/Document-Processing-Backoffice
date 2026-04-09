@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
+from domains import allowed_types
 from middleware.auth_middleware import get_current_user, require_role
 from models.db_models import Extraction, Job, User, ValidationFlag
 from services import audit_service, storage_service
@@ -25,7 +26,6 @@ router = APIRouter()
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-ALLOWED_DOC_TYPES = {"tax_return", "government_id", "bank_statement", "general"}
 ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"}
 
 
@@ -51,10 +51,10 @@ async def upload_document(
 
 
 async def _upload_document_inner(request, file, doc_type, session, current_user):
-    if doc_type not in ALLOWED_DOC_TYPES:
+    if doc_type not in allowed_types():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"doc_type must be one of: {', '.join(ALLOWED_DOC_TYPES)}",
+            detail=f"doc_type must be one of: {', '.join(sorted(allowed_types()))}",
         )
 
     filename = file.filename or "upload"

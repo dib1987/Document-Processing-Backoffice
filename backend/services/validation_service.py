@@ -12,53 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-# ──────────────────────────────────────────────
-# Configuration — adjust thresholds here
-# ──────────────────────────────────────────────
-
-REQUIRED_FIELDS: dict[str, list[str]] = {
-    "tax_return":    ["taxpayer_name", "ssn_primary", "tax_year"],
-    "government_id": ["full_name", "date_of_birth", "id_number", "expiration_date"],
-    "bank_statement": ["account_holder_name", "account_number", "bank_name", "ending_balance"],
-    "general":       ["primary_person_name", "document_date"],
-}
-
-FORMAT_RULES: dict[str, re.Pattern] = {
-    "ssn_primary":    re.compile(r"^XXX-XX-\d{4}$"),
-    "ssn_spouse":     re.compile(r"^XXX-XX-\d{4}$"),
-    "address_zip":    re.compile(r"^\d{5}(-\d{4})?$"),
-    "tax_year":       re.compile(r"^(19|20)\d{2}$"),
-    "date_of_birth":  re.compile(r"^\d{4}-\d{2}-\d{2}$"),
-    "issue_date":     re.compile(r"^\d{4}-\d{2}-\d{2}$"),
-    "expiration_date": re.compile(r"^\d{4}-\d{2}-\d{2}$"),
-    "statement_period_start": re.compile(r"^\d{4}-\d{2}-\d{2}$"),
-    "statement_period_end":   re.compile(r"^\d{4}-\d{2}-\d{2}$"),
-}
-
-# Dollar amounts — strip $ and commas, then compare
-RANGE_RULES: dict[str, tuple[float, float]] = {
-    "total_income": (0, 10_000_000),
-    "total_tax":    (0, 5_000_000),
-    "refund_amount": (0, 1_000_000),
-    "amount_owed":  (0, 1_000_000),
-    "ending_balance": (-500_000, 10_000_000),
-}
-
-# (doc_type, field_a, field_b, plain_message)
-CROSS_FIELD_RULES: list[tuple[str, str, str, str]] = [
-    (
-        "tax_return",
-        "refund_amount",
-        "amount_owed",
-        "A tax return cannot have both a refund and an amount owed at the same time.",
-    ),
-    (
-        "government_id",
-        "expiration_date",
-        "issue_date",
-        "The expiration date must be after the issue date.",
-    ),
-]
+from domains import get_domain
 
 
 # ──────────────────────────────────────────────
@@ -93,8 +47,8 @@ def validate(
     flags: list[ValidationFlag] = []
 
     _check_required(extracted_fields, doc_type, flags)
-    _check_formats(extracted_fields, flags)
-    _check_ranges(extracted_fields, flags)
+    _check_formats(extracted_fields, doc_type, flags)
+    _check_ranges(extracted_fields, doc_type, flags)
     _check_cross_fields(extracted_fields, doc_type, flags)
 
     return ValidationResult(passed=len(flags) == 0, flags=flags)
@@ -105,7 +59,7 @@ def validate(
 # ──────────────────────────────────────────────
 
 def _check_required(fields: dict, doc_type: str, flags: list[ValidationFlag]) -> None:
-    required = REQUIRED_FIELDS.get(doc_type, [])
+    required = get_domain(doc_type).required_fields
     for field_name in required:
         value = fields.get(field_name)
         if not value or str(value).strip() == "":
@@ -119,12 +73,12 @@ def _check_required(fields: dict, doc_type: str, flags: list[ValidationFlag]) ->
             ))
 
 
-def _check_formats(fields: dict, flags: list[ValidationFlag]) -> None:
-    for field_name, pattern in FORMAT_RULES.items():
+def _check_formats(fields: dict, doc_type: str, flags: list[ValidationFlag]) -> None:
+    for field_name, pattern_str in get_domain(doc_type).format_rules.items():
         value = fields.get(field_name)
         if value is None or str(value).strip() == "":
             continue  # Missing is caught by required check
-        if not pattern.match(str(value).strip()):
+        if not re.match(pattern_str, str(value).strip()):
             flags.append(ValidationFlag(
                 flag_type="FORMAT_MISMATCH",
                 field_name=field_name,
@@ -135,8 +89,8 @@ def _check_formats(fields: dict, flags: list[ValidationFlag]) -> None:
             ))
 
 
-def _check_ranges(fields: dict, flags: list[ValidationFlag]) -> None:
-    for field_name, (min_val, max_val) in RANGE_RULES.items():
+def _check_ranges(fields: dict, doc_type: str, flags: list[ValidationFlag]) -> None:
+    for field_name, (min_val, max_val) in get_domain(doc_type).range_rules.items():
         value = fields.get(field_name)
         if value is None or str(value).strip() == "":
             continue
@@ -155,34 +109,29 @@ def _check_ranges(fields: dict, flags: list[ValidationFlag]) -> None:
 
 
 def _check_cross_fields(fields: dict, doc_type: str, flags: list[ValidationFlag]) -> None:
-    for rule_doc_type, field_a, field_b, message in CROSS_FIELD_RULES:
-        if rule_doc_type != doc_type:
-            continue
-        val_a = fields.get(field_a)
-        val_b = fields.get(field_b)
+    for rule in get_domain(doc_type).cross_field_rules:
+        val_a = fields.get(rule.field_a)
+        val_b = fields.get(rule.field_b)
 
-        # Try dollar-amount comparison first (both fields are currency values)
-        a_num = _parse_dollar(str(val_a)) if val_a else None
-        b_num = _parse_dollar(str(val_b)) if val_b else None
-        if a_num is not None and b_num is not None:
-            # Generic rule: both fields have a positive value simultaneously → conflict
-            if a_num > 0 and b_num > 0:
+        if rule.rule_type == "mutually_exclusive":
+            a_num = _parse_dollar(str(val_a)) if val_a else None
+            b_num = _parse_dollar(str(val_b)) if val_b else None
+            if a_num is not None and b_num is not None and a_num > 0 and b_num > 0:
                 flags.append(ValidationFlag(
                     flag_type="CROSS_FIELD",
-                    field_name=f"{field_a}+{field_b}",
-                    plain_message=message,
+                    field_name=f"{rule.field_a}+{rule.field_b}",
+                    plain_message=rule.message,
                 ))
-            continue
 
-        # Try date comparison (field_a must be after field_b)
-        a_date = _parse_date(str(val_a)) if val_a else None
-        b_date = _parse_date(str(val_b)) if val_b else None
-        if a_date is not None and b_date is not None:
-            if a_date <= b_date:
+        elif rule.rule_type == "date_order":
+            # field_a must be chronologically after field_b
+            a_date = _parse_date(str(val_a)) if val_a else None
+            b_date = _parse_date(str(val_b)) if val_b else None
+            if a_date is not None and b_date is not None and a_date <= b_date:
                 flags.append(ValidationFlag(
                     flag_type="CROSS_FIELD",
-                    field_name=f"{field_a}+{field_b}",
-                    plain_message=message,
+                    field_name=f"{rule.field_a}+{rule.field_b}",
+                    plain_message=rule.message,
                 ))
 
 

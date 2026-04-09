@@ -18,54 +18,12 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domains import DOMAIN_REGISTRY, get_domain
 from models.db_models import HubSpotFieldMapping, Job, Organization
 
 logger = logging.getLogger(__name__)
 
 HUBSPOT_API_BASE = "https://api.hubapi.com"
-
-# ──────────────────────────────────────────────
-# Default field mappings (seeded on org creation)
-# ──────────────────────────────────────────────
-
-DEFAULT_MAPPINGS: dict[str, dict[str, str]] = {
-    "tax_return": {
-        "taxpayer_name":    "__split_name__",   # special: split into firstname/lastname
-        "address_street":   "address",
-        "address_city":     "city",
-        "address_state":    "state",
-        "address_zip":      "zip",
-        "total_income":     "annualrevenue",
-        "tax_year":         "tax_year",         # HubSpot strips _c suffix from internal name
-        "ssn_primary":      "ssn_last4",
-        "filing_status":    "filing_status",
-        "form_type":        "tax_form_type",
-    },
-    "government_id": {
-        "full_name":        "__split_name__",
-        "date_of_birth":    "date_of_birth",
-        "id_type":          "id_type",
-        "id_number":        "id_number_last4",
-        "expiration_date":  "id_expiration",
-        "address_street":   "address",
-        "address_city":     "city",
-        "address_state":    "state",
-        "address_zip":      "zip",
-    },
-    "bank_statement": {
-        "account_holder_name": "__split_name__",
-        "bank_name":           "bank_name",
-        "account_type":        "account_type",
-        "account_number":      "description",   # standard HubSpot field
-        "ending_balance":      "annualrevenue",
-    },
-    "general": {
-        "primary_person_name": "__split_name__",
-        "issuing_entity":      "company",
-        "document_category":   "jobtitle",      # standard HubSpot field
-        "dollar_amount":       "annualrevenue",
-    },
-}
 
 
 # ──────────────────────────────────────────────
@@ -153,7 +111,8 @@ async def seed_default_mapping(session: AsyncSession, org_id: str) -> None:
     Seed default field mappings for a new org.
     Called from the Clerk webhook handler when a new org is created.
     """
-    for doc_type, mapping in DEFAULT_MAPPINGS.items():
+    for doc_type, domain in DOMAIN_REGISTRY.items():
+        mapping = domain.default_hubspot_mapping
         existing = await session.scalar(
             select(HubSpotFieldMapping).where(
                 HubSpotFieldMapping.org_id == org_id,
@@ -183,7 +142,7 @@ async def _get_field_mapping(session: AsyncSession, org_id: str, doc_type: str) 
     )
     if row and row.mapping:
         return row.mapping
-    return DEFAULT_MAPPINGS.get(doc_type, {})
+    return get_domain(doc_type).default_hubspot_mapping
 
 
 def _apply_mapping(

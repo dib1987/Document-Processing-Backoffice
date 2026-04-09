@@ -18,7 +18,7 @@ from typing import Any
 import anthropic
 
 from config import get_settings
-from models.schemas import DOC_TYPE_LABELS, DOC_TYPE_SCHEMA_MAP
+from domains import get_domain
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -74,12 +74,9 @@ def extract_fields(
         All values are strings or None. Confidence values are
         "high" | "medium" | "low" | "not_found".
     """
-    schema_class = DOC_TYPE_SCHEMA_MAP.get(doc_type)
-    if schema_class is None:
-        raise ValueError(f"Unknown doc_type: {doc_type}")
-
-    doc_label = DOC_TYPE_LABELS[doc_type]
-    schema_json = json.dumps(schema_class.model_json_schema(), indent=2)
+    domain = get_domain(doc_type)   # raises ValueError if unknown
+    schema_json = json.dumps(domain.schema_class.model_json_schema(), indent=2)
+    doc_label = domain.label
 
     # Truncate text to stay within context budget
     truncated_text = full_text[:MAX_TEXT_CHARS]
