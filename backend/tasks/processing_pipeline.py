@@ -28,6 +28,7 @@ from sqlalchemy.pool import NullPool
 from celery_app import celery_app
 from config import get_settings
 from models.db_models import CRMLog, Extraction, Job, ReviewQueue, User, ValidationFlag
+from sqlalchemy import select
 from services import audit_service, email_service, extraction_service, hubspot_service, ocr_service, storage_service
 from services.validation_service import validate
 
@@ -133,14 +134,15 @@ async def _pipeline(job_id: str, start_ms: int) -> dict:
             job_id=job_id,
         )
 
-        # Persist extraction result
-        extraction = Extraction(
-            job_id=job_id,
-            doc_type=job.doc_type,
-            raw_fields=extracted_fields,
-            confidence=confidence,
-        )
-        session.add(extraction)
+        # Persist extraction result (skip if already exists from a prior retry)
+        existing = await session.scalar(select(Extraction).where(Extraction.job_id == job_id))
+        if not existing:
+            session.add(Extraction(
+                job_id=job_id,
+                doc_type=job.doc_type,
+                raw_fields=extracted_fields,
+                confidence=confidence,
+            ))
 
         await audit_service.log(
             session, org_id, "EXTRACTED", job_id=job_id,

@@ -26,7 +26,7 @@ router = APIRouter()
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp"}
+ALLOWED_EXTENSIONS = {".pdf"}
 
 
 @router.post("/upload", status_code=status.HTTP_202_ACCEPTED)

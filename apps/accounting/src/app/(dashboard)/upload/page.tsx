@@ -21,11 +21,10 @@ export default function UploadPage() {
   const upload = useUpload()
   const { data: jobStatus } = useJobStatus(jobId)
 
-  const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp']
   const handleFile = (f: File) => {
     const ext = '.' + f.name.split('.').pop()?.toLowerCase()
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      toast({ title: 'Unsupported file type. Please upload a PDF, JPG, PNG, or TIFF.', variant: 'destructive' })
+    if (ext !== '.pdf') {
+      toast({ title: 'Unsupported file type. Please upload a PDF.', variant: 'destructive' })
       return
     }
     setFile(f)
@@ -54,7 +53,7 @@ export default function UploadPage() {
 
   const isTerminal = jobStatus && ['crm_written', 'review_queue', 'error', 'crm_error', 'reupload_requested'].includes(jobStatus.status)
 
-  const ACCEPT = '.pdf,.jpg,.jpeg,.png,.tiff,.tif,.bmp'
+  const ACCEPT = '.pdf'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -71,7 +70,7 @@ export default function UploadPage() {
         <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
         <p className="font-medium text-slate-700">Drop a file here or click to browse</p>
-        <p className="text-sm text-slate-400 mt-1">PDF, JPG, PNG, TIFF — maximum 50 MB</p>
+        <p className="text-sm text-slate-400 mt-1">PDF only — maximum 50 MB</p>
       </div>
 
       {/* Selected file */}

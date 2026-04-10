@@ -1,4 +1,4 @@
-// File: C:\Agentic Workflow\Document Processing System\frontend\src\app\page.tsx
+// File: C:\Agentic Workflow\Document Processing System\apps\accounting\src\app\page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

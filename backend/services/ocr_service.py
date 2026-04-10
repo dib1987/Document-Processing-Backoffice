@@ -2,14 +2,13 @@
 OCR Service — extracts text from uploaded documents.
 
 Strategy:
-1. For PDFs: try PyMuPDF native text extraction first (fast, accurate for digital PDFs).
-   If text density < threshold (scanned/image-based PDF), fall back to OCR.
-2. For images (JPG, PNG, TIFF, BMP): always use pytesseract OCR.
+- PDF only: try PyMuPDF native text extraction first (fast, accurate for digital PDFs).
+  If text density < threshold (scanned/image-based PDF), render each page and OCR
+  with pytesseract.
 
 Returns: (full_text: str, page_count: int)
 """
 import io
-import os
 
 import fitz  # PyMuPDF
 import pytesseract
@@ -22,28 +21,13 @@ settings = get_settings()
 if settings.tesseract_cmd:
     pytesseract.pytesseract.tesseract_cmd = settings.tesseract_cmd
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".gif", ".webp"}
-PDF_EXTENSION = ".pdf"
-
 
 def extract_text(file_bytes: bytes, filename: str) -> tuple[str, int]:
     """
-    Extract text from document bytes.
+    Extract text from a PDF document.
     Returns (full_text, page_count).
     """
-    ext = os.path.splitext(filename)[1].lower()
-
-    if ext == PDF_EXTENSION:
-        return _extract_from_pdf(file_bytes)
-    elif ext in IMAGE_EXTENSIONS:
-        text = _ocr_image_bytes(file_bytes)
-        return text, 1
-    else:
-        # Try PDF path as fallback for unknown types
-        try:
-            return _extract_from_pdf(file_bytes)
-        except Exception:
-            return "", 0
+    return _extract_from_pdf(file_bytes)
 
 
 def _extract_from_pdf(file_bytes: bytes) -> tuple[str, int]:
