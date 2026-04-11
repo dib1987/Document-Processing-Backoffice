@@ -26,10 +26,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/upload/page.js"
     ],
-    "/(auth)/sign-in/page": [
+    "/(dashboard)/review/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/sign-in/page.js"
+      "static/chunks/app/(dashboard)/review/page.js"
+    ],
+    "/(dashboard)/settings/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/settings/page.js"
+    ],
+    "/(dashboard)/audit/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/audit/page.js"
+    ],
+    "/(dashboard)/export/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/export/page.js"
     ]
   }
 }

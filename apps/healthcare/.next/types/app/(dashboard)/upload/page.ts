@@ -1,4 +1,4 @@
-// File: C:\Agentic Workflow\Document Processing System\apps\healthcare\src\app\(dashboard)\upload\page.tsx
+// File: c:\Agentic Workflow\Document Processing System\apps\healthcare\src\app\(dashboard)\upload\page.tsx
 import * as entry from '../../../../../src/app/(dashboard)/upload/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
