@@ -90,11 +90,76 @@ class GeneralDocumentExtraction(BaseModel):
     _confidence: dict = {}
 
 
+class PatientIntakeExtraction(BaseModel):
+    patient_full_name: Optional[str] = None
+    date_of_birth: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    sex: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    pcp_name: Optional[str] = None
+    referring_provider_name: Optional[str] = None
+    patient_signature_present: Optional[str] = Field(None, description="'true' if patient signature is present on the form, 'false' if absent")
+    signature_date: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    preferred_language: Optional[str] = None
+    _confidence: dict = {}
+
+
+class InsuranceAuthorizationExtraction(BaseModel):
+    patient_full_name: Optional[str] = None
+    date_of_birth: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    payer_name: Optional[str] = None
+    member_id: Optional[str] = None
+    group_number: Optional[str] = None
+    plan_name: Optional[str] = None
+    policy_holder_name: Optional[str] = None
+    policy_holder_relationship: Optional[str] = None
+    referring_provider_name: Optional[str] = None
+    servicing_provider_name: Optional[str] = None
+    npi_number: Optional[str] = Field(None, description="10-digit NPI number")
+    referral_number: Optional[str] = None
+    prior_authorization_number: Optional[str] = None
+    authorization_status: Optional[str] = Field(None, description="approved | pending | denied | not_required")
+    authorization_start_date: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    authorization_end_date: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    requested_service: Optional[str] = None
+    icd10_codes: Optional[str] = Field(None, description="Comma-separated ICD-10 diagnosis codes, e.g. 'M54.5, G89.29'")
+    cpt_codes: Optional[str] = Field(None, description="Comma-separated CPT procedure codes, e.g. '99213, 20610'")
+    _confidence: dict = {}
+
+
+class ClinicalSupportExtraction(BaseModel):
+    patient_full_name: Optional[str] = None
+    date_of_birth: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    document_date: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    document_type_label: Optional[str] = Field(None, description="e.g. Physician Note, Discharge Summary, Lab Report, Diagnosis Summary, Order Sheet, Medical Necessity Letter")
+    provider_name: Optional[str] = None
+    provider_npi: Optional[str] = Field(None, description="10-digit NPI number")
+    facility_name: Optional[str] = None
+    diagnosis_summary: Optional[str] = None
+    icd10_codes: Optional[str] = Field(None, description="Comma-separated ICD-10 diagnosis codes")
+    requested_service: Optional[str] = None
+    cpt_codes: Optional[str] = Field(None, description="Comma-separated CPT procedure codes")
+    date_of_service: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
+    medical_necessity_present: Optional[str] = Field(None, description="'true' if medical necessity is documented in this record, 'false' if explicitly not present")
+    provider_signature_present: Optional[str] = Field(None, description="'true' if provider signature is present, 'false' if absent")
+    _confidence: dict = {}
+
+
 DOC_TYPE_SCHEMA_MAP: dict[str, type] = {
     "tax_return": TaxReturnExtraction,
     "government_id": GovernmentIDExtraction,
     "bank_statement": BankStatementExtraction,
     "general": GeneralDocumentExtraction,
+    "patient_intake": PatientIntakeExtraction,
+    "insurance_authorization": InsuranceAuthorizationExtraction,
+    "clinical_support": ClinicalSupportExtraction,
 }
 
 DOC_TYPE_LABELS: dict[str, str] = {
@@ -102,4 +167,7 @@ DOC_TYPE_LABELS: dict[str, str] = {
     "government_id": "Government-Issued Photo ID (Driver License / Passport / State ID)",
     "bank_statement": "Bank or Financial Account Statement",
     "general": "General Financial Document",
+    "patient_intake": "Patient Intake Packet",
+    "insurance_authorization": "Insurance / Referral / Prior Authorization Packet",
+    "clinical_support": "Clinical Support Packet",
 }

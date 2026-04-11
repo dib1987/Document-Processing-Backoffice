@@ -13,16 +13,16 @@ they call get_domain(doc_type) and read properties from the config.
 """
 from .accounting import ACCOUNTING_DOMAINS
 from .base import DomainConfig
+from .healthcare import HEALTHCARE_DOMAINS
 
 # ── Register all active domains ──────────────────────────────────────────────
 # To add a new domain uncomment/add the import and extend the list below:
 #
-#   from .healthcare import HEALTHCARE_DOMAINS
 #   from .legal import LEGAL_DOMAINS
 
 _ALL_DOMAINS: list[DomainConfig] = [
     *ACCOUNTING_DOMAINS,
-    # *HEALTHCARE_DOMAINS,
+    *HEALTHCARE_DOMAINS,
     # *LEGAL_DOMAINS,
 ]
 

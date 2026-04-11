@@ -41,6 +41,9 @@ class DomainConfig:
         format_rules           dict[field_name, regex_pattern_string] — format validation
         range_rules            dict[field_name, (min, max)] — numeric bounds (dollar amounts)
         cross_field_rules      Constraints spanning two fields (optional)
+        value_rules            dict[field_name, expected_value] — field must equal this value
+                               (case-insensitive). Null values are not flagged here.
+                               Use for boolean fields, e.g. {"patient_signature_present": "true"}
         default_hubspot_mapping  dict[extracted_field, hubspot_property] for CRM push
                                Use "__split_name__" to split a full name into firstname/lastname
     """
@@ -51,4 +54,5 @@ class DomainConfig:
     format_rules: dict[str, str]                   # field → raw regex string
     range_rules: dict[str, tuple[float, float]]    # field → (min, max)
     cross_field_rules: list[CrossFieldRule] = field(default_factory=list)
+    value_rules: dict[str, str] = field(default_factory=dict)
     default_hubspot_mapping: dict[str, str] = field(default_factory=dict)

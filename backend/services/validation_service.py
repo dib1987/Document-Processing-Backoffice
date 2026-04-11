@@ -21,7 +21,7 @@ from domains import get_domain
 
 @dataclass
 class ValidationFlag:
-    flag_type: str    # MISSING_REQUIRED | OUT_OF_RANGE | FORMAT_MISMATCH | CROSS_FIELD
+    flag_type: str    # MISSING_REQUIRED | OUT_OF_RANGE | FORMAT_MISMATCH | CROSS_FIELD | VALUE_MISMATCH
     field_name: str | None
     plain_message: str  # Shown directly to the non-technical reviewer
 
@@ -50,6 +50,7 @@ def validate(
     _check_formats(extracted_fields, doc_type, flags)
     _check_ranges(extracted_fields, doc_type, flags)
     _check_cross_fields(extracted_fields, doc_type, flags)
+    _check_values(extracted_fields, doc_type, flags)
 
     return ValidationResult(passed=len(flags) == 0, flags=flags)
 
@@ -133,6 +134,22 @@ def _check_cross_fields(fields: dict, doc_type: str, flags: list[ValidationFlag]
                     field_name=f"{rule.field_a}+{rule.field_b}",
                     plain_message=rule.message,
                 ))
+
+
+def _check_values(fields: dict, doc_type: str, flags: list[ValidationFlag]) -> None:
+    for field_name, expected in get_domain(doc_type).value_rules.items():
+        value = fields.get(field_name)
+        if value is None or str(value).strip() == "":
+            continue  # null is handled by required_fields check
+        if str(value).strip().lower() != expected.lower():
+            flags.append(ValidationFlag(
+                flag_type="VALUE_MISMATCH",
+                field_name=field_name,
+                plain_message=(
+                    f'"{_label(field_name)}" must be "{expected}" for auto-approval. '
+                    f'Got: "{value}". Please review and correct before approving.'
+                ),
+            ))
 
 
 # ──────────────────────────────────────────────
