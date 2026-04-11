@@ -117,6 +117,39 @@ def send_approval_notification(
     )
 
 
+def send_rejection_notification(
+    to_email: str,
+    filename: str,
+    doc_type: str,
+    reason: str,
+) -> bool:
+    """
+    Notify the uploader that their document was rejected by a reviewer.
+    Returns True on success, False on failure (never raises).
+    """
+    body_html = f"""
+        <p>Unfortunately, the document <strong>"{filename}"</strong> ({doc_type.replace('_', ' ').title()}) could not be accepted.</p>
+        <div style="background: #fdecea; border-radius: 6px; padding: 16px; border: 1px solid #f5c6cb; margin: 16px 0;">
+            <strong>Reason:</strong> {reason}
+        </div>
+        <p>Please contact our team if you have any questions or need assistance submitting a corrected document.</p>
+    """
+    body_text = (
+        f"Your document '{filename}' was not accepted.\n\n"
+        f"Reason: {reason}\n\n"
+        "Please contact our team if you have questions or need to submit a corrected document."
+    )
+    return send_document_notification(
+        to_email=to_email,
+        subject=f"Document Not Accepted: '{filename}'",
+        heading="Document Not Accepted",
+        heading_color="#c0392b",
+        border_color="#c0392b",
+        body_html=body_html,
+        body_text=body_text,
+    )
+
+
 def send_reupload_request(
     to_email: str,
     filename: str,

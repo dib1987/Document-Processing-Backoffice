@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, Upload, ClipboardList, Shield, Settings, FileText, X,
+  LayoutDashboard, Upload, ClipboardList, Shield, Settings, FileText, X, Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useReviewQueue } from '@/lib/hooks/useReviewQueue'
@@ -19,6 +19,7 @@ const navItems = [
   { href: '/review',    label: 'Review Queue', icon: ClipboardList,    minRole: 'reviewer', showBadge: true },
   { href: '/audit',     label: 'Audit Trail',  icon: Shield,           minRole: 'reviewer' },
   { href: '/settings',  label: 'Settings',     icon: Settings,         minRole: 'reviewer' },
+  { href: '/export',    label: 'Export',       icon: Download,         minRole: 'admin' },
 ]
 
 const ROLE_LEVEL: Record<string, number> = { viewer: 0, reviewer: 1, admin: 2 }

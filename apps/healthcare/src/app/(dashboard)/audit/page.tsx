@@ -5,6 +5,7 @@ import { useAuth, useOrganization } from '@clerk/nextjs'
 import { auditApi, setAuthHeaders } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import { Shield } from 'lucide-react'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 function useAuditLog() {
   const { getToken } = useAuth()
@@ -22,15 +23,34 @@ function useAuditLog() {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  upload:   'bg-blue-50 text-blue-700',
-  approve:  'bg-emerald-50 text-emerald-700',
-  reject:   'bg-red-50 text-red-700',
-  crm_push: 'bg-indigo-50 text-indigo-700',
-  error:    'bg-red-50 text-red-700',
+  UPLOADED:          'bg-blue-50 text-blue-700',
+  OCR_STARTED:       'bg-slate-50 text-slate-600',
+  OCR_COMPLETE:      'bg-slate-50 text-slate-600',
+  EXTRACTED:         'bg-purple-50 text-purple-700',
+  FLAGGED:           'bg-amber-50 text-amber-700',
+  REVIEWED:          'bg-sky-50 text-sky-700',
+  FIELD_CHANGED:     'bg-sky-50 text-sky-700',
+  APPROVED:          'bg-emerald-50 text-emerald-700',
+  REJECTED:          'bg-red-50 text-red-700',
+  CRM_WRITTEN:       'bg-indigo-50 text-indigo-700',
+  CRM_ERROR:         'bg-red-50 text-red-700',
+  REUPLOAD_REQUESTED:'bg-amber-50 text-amber-700',
+  ERROR:             'bg-red-50 text-red-700',
 }
 
 export default function AuditPage() {
+  const { data: currentUser } = useCurrentUser()
   const { data: entries, isLoading } = useAuditLog()
+
+  if (currentUser && currentUser.role === 'viewer') {
+    return (
+      <div className="max-w-2xl">
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+          <p className="text-slate-500 text-sm">You do not have permission to access this page.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200">

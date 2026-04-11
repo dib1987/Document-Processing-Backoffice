@@ -105,7 +105,7 @@ class PatientIntakeExtraction(BaseModel):
     emergency_contact_phone: Optional[str] = None
     pcp_name: Optional[str] = None
     referring_provider_name: Optional[str] = None
-    patient_signature_present: Optional[str] = Field(None, description="'true' if patient signature is present on the form, 'false' if absent")
+    patient_signature_present: Optional[str] = Field(None, description="'true' ONLY if a patient signature (handwritten name, initials, or mark) is clearly visible. Return 'false' if the signature line is blank, shows only underscores or a printed line, or contains no actual signature content. Default to 'false' when uncertain.")
     signature_date: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
     preferred_language: Optional[str] = None
     _confidence: dict = {}
@@ -147,8 +147,8 @@ class ClinicalSupportExtraction(BaseModel):
     requested_service: Optional[str] = None
     cpt_codes: Optional[str] = Field(None, description="Comma-separated CPT procedure codes")
     date_of_service: Optional[str] = Field(None, description="ISO 8601 format: YYYY-MM-DD")
-    medical_necessity_present: Optional[str] = Field(None, description="'true' if medical necessity is documented in this record, 'false' if explicitly not present")
-    provider_signature_present: Optional[str] = Field(None, description="'true' if provider signature is present, 'false' if absent")
+    medical_necessity_present: Optional[str] = Field(None, description="'true' ONLY if the document contains explicit medical necessity language (e.g. a medical necessity statement, letter of medical necessity, or physician attestation). Return 'false' if no such language is present. Default to 'false' when uncertain.")
+    provider_signature_present: Optional[str] = Field(None, description="'true' ONLY if a provider/physician signature (handwritten name, stamp, or countersigned block with content) is clearly visible. Return 'false' if the signature area is blank or shows only a printed line. Default to 'false' when uncertain.")
     _confidence: dict = {}
 
 

@@ -242,7 +242,7 @@ async def reject_review(
     review.reviewed_at = datetime.now(timezone.utc)
     review.reject_reason = body.reason
 
-    job.status = "error"
+    job.status = "rejected"
     job.error_message = f"Rejected by reviewer: {body.reason}"
 
     await audit_service.log(
@@ -252,6 +252,17 @@ async def reject_review(
         detail={"reason": body.reason},
     )
     await session.commit()
+
+    # Notify uploader best-effort (never block rejection on email failure)
+    uploader = await session.get(User, job.uploaded_by) if job.uploaded_by else None
+    if uploader and uploader.email:
+        email_service.send_rejection_notification(
+            to_email=uploader.email,
+            filename=job.original_filename,
+            doc_type=job.doc_type,
+            reason=body.reason,
+        )
+
     return {"status": "rejected"}
 
 
@@ -287,7 +298,7 @@ async def request_reupload(
             to_email=to_email,
             filename=job.original_filename,
             doc_type=job.doc_type,
-            flags=[f.plain_message for f in flags],
+            flags=[_to_client_message(f) for f in flags],
             message=body.message,
         )
 
@@ -332,3 +343,67 @@ async def _get_reviewable_job(session, job_id: str, org_id: str) -> Job:
 def _is_sensitive(field_name: str) -> bool:
     keywords = ("ssn", "account_number", "routing_number", "id_number")
     return any(kw in field_name.lower() for kw in keywords)
+
+
+def _to_client_message(flag) -> str:
+    """
+    Convert an internal ValidationFlag to a plain-English message suitable
+    for the re-upload email sent to the document uploader.
+
+    The review queue UI still shows plain_message (technical, for the admin).
+    This function produces uploader-facing language: actionable, no jargon.
+    """
+    fn = flag.field_name or ""
+    label = fn.replace("_", " ").title() if fn and "+" not in fn else None
+
+    if flag.flag_type == "MISSING_REQUIRED":
+        return (
+            f'"{label}" is missing from the document. '
+            "Please ensure this information is clearly included before re-uploading."
+        )
+
+    if flag.flag_type == "FORMAT_MISMATCH":
+        if "date" in fn:
+            return f'"{label}" has an incorrect date format. Please use YYYY-MM-DD (e.g. 2025-01-15).'
+        if "phone" in fn or "fax" in fn:
+            return f'"{label}" has an incorrect format. Please enter a valid phone number (e.g. (555) 123-4567).'
+        if "zip" in fn or "postal" in fn:
+            return f'"{label}" has an incorrect format. Please enter a valid 5-digit ZIP code.'
+        if "npi" in fn:
+            return f'"{label}" must be a 10-digit NPI number. Please verify and correct before re-uploading.'
+        if "member_id" in fn:
+            return f'"{label}" has an unexpected format. Please verify this matches exactly what appears on the insurance card.'
+        if "email" in fn:
+            return f'"{label}" does not appear to be a valid email address. Please double-check and correct.'
+        if "ssn" in fn:
+            return f'"{label}" has an incorrect format. Please ensure only the last 4 digits are visible.'
+        return (
+            f'"{label}" has an incorrect format. '
+            "Please verify and correct this information before re-uploading."
+        )
+
+    if flag.flag_type == "OUT_OF_RANGE":
+        return (
+            f'"{label}" contains a value outside the expected range. '
+            "Please verify this is correct before re-uploading."
+        )
+
+    if flag.flag_type == "VALUE_MISMATCH":
+        if "signature" in fn:
+            return (
+                "A required signature is missing from the document. "
+                "Please ensure all required signatures are completed before re-uploading."
+            )
+        if "medical_necessity" in fn:
+            return (
+                "Medical necessity documentation is required but was not found. "
+                "Please include a completed medical necessity statement or physician attestation."
+            )
+        if label:
+            return (
+                f'"{label}" does not meet the required criteria. '
+                "Please review and correct this before re-uploading."
+            )
+
+    # CROSS_FIELD rules are already written in plain English by the domain author
+    return flag.plain_message

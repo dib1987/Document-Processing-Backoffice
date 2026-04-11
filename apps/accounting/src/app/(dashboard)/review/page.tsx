@@ -5,8 +5,21 @@ import { useReviewQueue, useReviewDetail, useApprove, useReject, useRequestReupl
 import { useToast } from '@/components/ui/use-toast'
 import { formatDate, DOC_TYPE_LABELS } from '@/lib/utils'
 import { ClipboardList, CheckCircle, XCircle, ChevronRight, X, Mail } from 'lucide-react'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+
+function AccessDenied() {
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+        <p className="text-slate-500 text-sm">You do not have permission to access this page.</p>
+      </div>
+    </div>
+  )
+}
 
 export default function ReviewQueuePage() {
+  const { data: currentUser } = useCurrentUser()
+  if (currentUser && currentUser.role === 'viewer') return <AccessDenied />
   const { data: items, isLoading } = useReviewQueue()
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')

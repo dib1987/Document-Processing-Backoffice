@@ -36,8 +36,8 @@ _SSN_PATTERN = re.compile(r"\b(\d{3})-(\d{2})-(\d{4})\b")
 _ACCOUNT_PATTERN = re.compile(r"\b\d{4,}(\d{4})\b")  # 5+ digit numbers → keep last 4
 
 
-SYSTEM_PROMPT = """You are a professional data extraction assistant for an accounting firm.
-Your job is to extract specific fields from financial and identity documents with precision.
+_SYSTEM_PROMPT_TEMPLATE = """You are a professional data extraction assistant specializing in {domain_label} documents.
+Your job is to extract specific fields from these documents with precision.
 
 Rules you MUST follow:
 1. Return ONLY valid JSON — no explanation, no markdown, no extra text.
@@ -52,7 +52,16 @@ Rules you MUST follow:
 6. Account numbers: return ONLY the last 4 digits in format "XXXX-NNNN".
 7. Dates: use ISO 8601 format (YYYY-MM-DD) where possible.
 8. Dollar amounts: include the $ sign and use comma separators (e.g., "$124,500").
+9. For boolean presence fields (e.g. signature_present, medical_necessity_present):
+   Return "true" ONLY if you see clear, positive evidence (e.g. a name written, an ink mark,
+   explicit text such as "signed", "authorized", or a dated signature block with content).
+   Return "false" if the field is blank, shows only underscores/lines, or has no content.
+   Never default to "true" when uncertain — default to "false".
 """
+
+
+def _build_system_prompt(domain_label: str) -> str:
+    return _SYSTEM_PROMPT_TEMPLATE.format(domain_label=domain_label)
 
 
 def extract_fields(
@@ -106,7 +115,7 @@ Return JSON only. No other text."""
             model=settings.claude_model,
             max_tokens=2048,
             temperature=0,
-            system=SYSTEM_PROMPT,
+            system=_build_system_prompt(doc_label),
             messages=[{"role": "user", "content": user_prompt}],
         )
     except anthropic.AuthenticationError:

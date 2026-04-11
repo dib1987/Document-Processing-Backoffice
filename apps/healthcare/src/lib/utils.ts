@@ -55,6 +55,7 @@ export const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg
   crm_error:    { label: 'CRM Error',   color: 'text-red-700',   bg: 'bg-red-50' },
   error:              { label: 'Error',            color: 'text-red-700',    bg: 'bg-red-50' },
   reupload_requested: { label: 'Re-upload Needed', color: 'text-amber-700',  bg: 'bg-amber-50' },
+  rejected:           { label: 'Rejected',         color: 'text-red-700',    bg: 'bg-red-50' },
 }
 
 export function isProcessing(status: JobStatus): boolean {

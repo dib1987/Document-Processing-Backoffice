@@ -12,7 +12,7 @@ function useAuthHeaders() {
   }
 }
 
-export function useJobs(params?: { status_filter?: string; limit?: number }) {
+export function useJobs(params?: { status_filter?: string; doc_types?: string; limit?: number }) {
   const setupHeaders = useAuthHeaders()
   return useQuery({
     queryKey: ['jobs', params],
@@ -37,7 +37,7 @@ export function useJobStatus(jobId: string | null, enabled = true) {
     enabled: !!jobId && enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      const done = status === 'crm_written' || status === 'review_queue' || status === 'error' || status === 'crm_error' || status === 'reupload_requested'
+      const done = status === 'crm_written' || status === 'review_queue' || status === 'error' || status === 'crm_error' || status === 'reupload_requested' || status === 'rejected'
       return done ? false : 3_000
     },
   })

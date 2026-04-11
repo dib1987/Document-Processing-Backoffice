@@ -11,6 +11,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/review': 'Review Queue',
   '/audit': 'Audit Trail',
   '/settings': 'Settings',
+  '/export':   'Export',
 }
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

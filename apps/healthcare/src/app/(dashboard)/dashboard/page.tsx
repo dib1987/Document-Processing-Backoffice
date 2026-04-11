@@ -18,7 +18,7 @@ export default function DashboardPage() {
   }, [currentUser, router])
 
   const { data: stats, isLoading: statsLoading } = useDashboard()
-  const { data: jobs, isLoading: jobsLoading } = useJobs({ limit: 10 })
+  const { data: jobs, isLoading: jobsLoading } = useJobs({ limit: 10, doc_types: 'patient_intake,insurance_authorization,clinical_support' })
 
   const statCards = [
     {

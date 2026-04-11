@@ -17,7 +17,7 @@ export function setAuthHeaders(token: string, orgId: string) {
 
 export type JobStatus =
   | 'pending' | 'queued' | 'ocr' | 'extracting' | 'validating'
-  | 'review_queue' | 'crm_pending' | 'crm_written' | 'crm_error' | 'error' | 'reupload_requested'
+  | 'review_queue' | 'crm_pending' | 'crm_written' | 'crm_error' | 'error' | 'reupload_requested' | 'rejected'
 
 export type DocType = 'patient_intake' | 'insurance_authorization' | 'clinical_support'
 
@@ -100,7 +100,7 @@ export const jobsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
-  list: (params?: { status_filter?: string; limit?: number; offset?: number }) =>
+  list: (params?: { status_filter?: string; doc_types?: string; limit?: number; offset?: number }) =>
     api.get<Job[]>('/jobs', { params }),
   status: (jobId: string) =>
     api.get<{ job_id: string; status: JobStatus; error_message: string | null }>(`/jobs/${jobId}/status`),

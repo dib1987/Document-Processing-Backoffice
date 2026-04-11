@@ -133,12 +133,17 @@ async def _upload_document_inner(request, file, doc_type, session, current_user)
 async def list_jobs(
     request: Request,
     status_filter: str | None = None,
+    doc_types: str | None = None,
     limit: int = 50,
     offset: int = 0,
     session: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("viewer")),
 ):
-    """List all jobs for this org, newest first."""
+    """List all jobs for this org, newest first.
+
+    doc_types: optional comma-separated list to filter by doc type,
+               e.g. "patient_intake,insurance_authorization,clinical_support"
+    """
     query = (
         select(Job)
         .where(Job.org_id == request.state.org_id)
@@ -148,6 +153,10 @@ async def list_jobs(
     )
     if status_filter:
         query = query.where(Job.status == status_filter)
+    if doc_types:
+        allowed = [t.strip() for t in doc_types.split(",") if t.strip()]
+        if allowed:
+            query = query.where(Job.doc_type.in_(allowed))
 
     jobs = (await session.scalars(query)).all()
     return [_job_summary(j) for j in jobs]
