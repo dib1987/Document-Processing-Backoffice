@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 frontend/node_modules/
+apps/*/node_modules/
 
 # Python
 __pycache__/
@@ -20,6 +21,8 @@ backend/.env
 # Next.js
 frontend/.next/
 frontend/out/
+apps/*/.next/
+apps/*/out/
 
 # Logs
 *.log
