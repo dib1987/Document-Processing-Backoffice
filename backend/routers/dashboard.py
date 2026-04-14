@@ -91,12 +91,15 @@ async def get_dashboard_stats(
         .limit(10)
     )).all()
 
+    auto_approved_rate = round((auto_approved / docs_this_month * 100) if docs_this_month > 0 else 0, 1)
+
     return {
-        "total_processed": docs_this_month,
-        "auto_approved": auto_approved,
-        "pending_review": pending_review,
-        "errors": errors,
-        "hours_saved": hours_saved,
+        "stats": {
+            "docs_processed_this_month": docs_this_month,
+            "hours_saved_this_month": hours_saved,
+            "auto_approved_rate": auto_approved_rate,
+            "pending_review_count": pending_review,
+        },
         "weekly_chart": weekly_chart,
         "recent_jobs": [
             {
