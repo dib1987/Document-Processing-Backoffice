@@ -38,7 +38,7 @@ export default function ReviewQueuePage() {
   const handleApprove = async () => {
     if (!selectedJobId) return
     try {
-      const mergedFields = { ...detail?.fields ?? {}, ...editedFields }
+      const mergedFields = { ...(detail?.extraction?.fields ?? {}), ...editedFields }
       await approve.mutateAsync({ jobId: selectedJobId, correctedFields: mergedFields })
       toast({ title: 'Document approved and pushed to HubSpot' })
       setSelectedJobId(null)
@@ -127,7 +127,7 @@ export default function ReviewQueuePage() {
       {selectedJobId && detail ? (
         <div className="flex-1 bg-white rounded-xl border border-slate-200 p-5 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 truncate">{detail.filename}</h2>
+            <h2 className="font-semibold text-slate-800 truncate">{detail.original_filename}</h2>
             <button onClick={() => setSelectedJobId(null)} className="text-slate-400 hover:text-slate-600">
               <X className="w-5 h-5" />
             </button>
@@ -147,14 +147,14 @@ export default function ReviewQueuePage() {
           )}
 
           {/* Extracted fields */}
-          {detail.fields && Object.keys(detail.fields).length > 0 && (
+          {detail.extraction && Object.keys(detail.extraction.fields).length > 0 && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-slate-600">Extracted Fields</h3>
                 <span className="text-xs text-slate-400">Click a value to edit</span>
               </div>
               <div className="space-y-1">
-                {Object.entries(detail.fields).map(([key, value]) => {
+                {Object.entries(detail.extraction.fields).map(([key, value]) => {
                   const displayValue = editedFields[key] ?? String(value ?? '')
                   const isEdited = key in editedFields
                   const isEditing = editingKey === key
