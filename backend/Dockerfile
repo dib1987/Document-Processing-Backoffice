@@ -14,6 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
 
+# Create worker startup script inside the container (avoids Windows CRLF issues)
+RUN printf '#!/bin/sh\nexec python3 -m celery -A celery_app worker --loglevel=info -Q documents\n' > /start_worker.sh \
+    && chmod +x /start_worker.sh
+
 EXPOSE $PORT
 
 CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
