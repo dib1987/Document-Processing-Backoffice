@@ -23,28 +23,28 @@ export default function DashboardPage() {
   const statCards = [
     {
       label: 'Total Processed',
-      value: stats?.total_processed ?? 0,
+      value: stats?.stats.docs_processed_this_month ?? 0,
       icon: FileText,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
     },
     {
-      label: 'Auto-Approved',
-      value: stats?.auto_approved ?? 0,
+      label: 'Auto-Approved Rate',
+      value: stats?.stats.auto_approved_rate ?? 0,
       icon: CheckCircle,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
     },
     {
       label: 'Pending Review',
-      value: stats?.pending_review ?? 0,
+      value: stats?.stats.pending_review_count ?? 0,
       icon: Clock,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
     },
     {
-      label: 'Errors',
-      value: stats?.errors ?? 0,
+      label: 'Hours Saved',
+      value: stats?.stats.hours_saved_this_month ?? 0,
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
@@ -77,8 +77,8 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl p-5 text-white flex items-center justify-between">
           <div>
             <p className="text-indigo-200 text-sm font-medium">Estimated Time Saved</p>
-            <p className="text-3xl font-bold mt-1">{stats.hours_saved?.toFixed(1) ?? '0'} hrs</p>
-            <p className="text-indigo-200 text-sm mt-1">Based on {stats.total_processed} documents processed</p>
+            <p className="text-3xl font-bold mt-1">{stats.stats.hours_saved_this_month?.toFixed(1) ?? '0'} hrs</p>
+            <p className="text-indigo-200 text-sm mt-1">Based on {stats.stats.docs_processed_this_month} documents processed</p>
           </div>
           <TrendingUp className="w-12 h-12 text-indigo-300 opacity-80" />
         </div>
