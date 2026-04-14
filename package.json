@@ -10,9 +10,5 @@
     "accounting": "cd apps/accounting && npm run dev",
     "healthcare": "cd apps/healthcare && npm run dev",
     "legal": "cd apps/legal && npm run dev"
-  },
-  "overrides": {
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
   }
 }

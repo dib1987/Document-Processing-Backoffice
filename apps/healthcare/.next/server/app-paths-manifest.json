@@ -1,7 +1,5 @@
 {
-  "/(dashboard)/upload/page": "app/(dashboard)/upload/page.js",
-  "/(dashboard)/settings/page": "app/(dashboard)/settings/page.js",
-  "/(dashboard)/audit/page": "app/(dashboard)/audit/page.js",
   "/(dashboard)/review/page": "app/(dashboard)/review/page.js",
-  "/(dashboard)/export/page": "app/(dashboard)/export/page.js"
+  "/(dashboard)/upload/page": "app/(dashboard)/upload/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js"
 }
